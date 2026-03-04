@@ -2,8 +2,8 @@ use crate::canvas::Canvas;
 use crate::error::UnidError;
 use crate::object::arrow::{corner_char, segment_dir, ResolvedArrow};
 use crate::object::{
-    BorderStyle, ContentAlign, ContentOverflow, DrawObject, HLine, LineStyle, Rect, Text,
-    VLine,
+    BorderStyle, ContentAlign, ContentOverflow, DrawObject, HLine, Legend, LegendPos, LineStyle,
+    Rect, Text, VLine,
 };
 use crate::width;
 
@@ -217,6 +217,22 @@ impl Renderer {
             }
         }
 
+        // Legend
+        if let Some(legend) = &rect.legend {
+            let effective_pos = match legend.pos {
+                LegendPos::Auto | LegendPos::Top => LegendPos::Top,
+                LegendPos::Bottom => LegendPos::Bottom,
+                _ => LegendPos::Top, // Rect only supports top/bottom
+            };
+            let lg_col = col;
+            let lg_row = match effective_pos {
+                LegendPos::Top => row.saturating_sub(1),
+                LegendPos::Bottom => row + inner_h + 2,
+                _ => unreachable!(),
+            };
+            self.draw_legend_text(lg_col, lg_row, legend, idx)?;
+        }
+
         Ok(())
     }
 
@@ -271,6 +287,21 @@ impl Renderer {
         )
     }
 
+    /// Draws legend text at the given position (multiline supported).
+    /// Legend text is rendered without collision check (text always wins over structure).
+    fn draw_legend_text(
+        &mut self,
+        col: usize,
+        row: usize,
+        legend: &Legend,
+        idx: usize,
+    ) -> Result<(), UnidError> {
+        for (i, line) in legend.text.lines().enumerate() {
+            self.canvas.put_str(col, row + i, line, false, idx)?;
+        }
+        Ok(())
+    }
+
     fn draw_text(&mut self, text: &Text, idx: usize) -> Result<(), UnidError> {
         for (i, line) in text.content.lines().enumerate() {
             self.canvas
@@ -285,6 +316,25 @@ impl Renderer {
             self.canvas
                 .put_char(hline.col + c, hline.row, ch, self.collision, idx)?;
         }
+
+        if let Some(legend) = &hline.legend {
+            let effective_pos = match legend.pos {
+                LegendPos::Auto | LegendPos::Top => LegendPos::Top,
+                other => other,
+            };
+            let (lg_col, lg_row) = match effective_pos {
+                LegendPos::Top => (hline.col, hline.row.saturating_sub(1)),
+                LegendPos::Bottom => (hline.col, hline.row + 1),
+                LegendPos::Left => {
+                    let tw = width::str_width(&legend.text);
+                    (hline.col.saturating_sub(tw + 1), hline.row)
+                }
+                LegendPos::Right => (hline.col + hline.length + 1, hline.row),
+                LegendPos::Auto => unreachable!(),
+            };
+            self.draw_legend_text(lg_col, lg_row, legend, idx)?;
+        }
+
         Ok(())
     }
 
@@ -294,6 +344,26 @@ impl Renderer {
             self.canvas
                 .put_char(vline.col, vline.row + r, ch, self.collision, idx)?;
         }
+
+        if let Some(legend) = &vline.legend {
+            let effective_pos = match legend.pos {
+                LegendPos::Auto | LegendPos::Right => LegendPos::Right,
+                other => other,
+            };
+            let mid_row = vline.row + vline.length / 2;
+            let (lg_col, lg_row) = match effective_pos {
+                LegendPos::Top => (vline.col, vline.row.saturating_sub(1)),
+                LegendPos::Bottom => (vline.col, vline.row + vline.length),
+                LegendPos::Left => {
+                    let tw = width::str_width(&legend.text);
+                    (vline.col.saturating_sub(tw + 1), mid_row)
+                }
+                LegendPos::Right => (vline.col + 2, mid_row),
+                LegendPos::Auto => unreachable!(),
+            };
+            self.draw_legend_text(lg_col, lg_row, legend, idx)?;
+        }
+
         Ok(())
     }
 

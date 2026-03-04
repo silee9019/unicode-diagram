@@ -2,8 +2,8 @@ use crate::dsl::command::{CanvasSize, DslCommand};
 use crate::error::UnidError;
 use crate::object::rect::Side;
 use crate::object::{
-    BorderStyle, ContentAlign, ContentOverflow, DrawObject, HLine, LineStyle, Rect, Text,
-    VLine,
+    BorderStyle, ContentAlign, ContentOverflow, DrawObject, HLine, Legend, LegendPos, LineStyle,
+    Rect, Text, VLine,
 };
 
 /// Parses DSL text into a list of commands.
@@ -85,14 +85,60 @@ fn extract_content(tokens: &[String], from: usize, line: usize) -> Result<String
     })
 }
 
-/// Finds the index of the content= or c= token, or returns tokens.len() if not found.
-fn content_token_index(tokens: &[String], from: usize) -> usize {
+/// Finds the index of the first greedy token (content=/c=/lg=), or returns tokens.len().
+fn greedy_token_index(tokens: &[String], from: usize) -> usize {
     for (i, token) in tokens.iter().enumerate().skip(from) {
-        if token.starts_with("content=") || token.starts_with("c=") {
+        if token.starts_with("content=")
+            || token.starts_with("c=")
+            || token.starts_with("lg=")
+            || token.starts_with("legend=")
+        {
             return i;
         }
     }
     tokens.len()
+}
+
+/// Extracts a legend= or lg= value from tokens starting at `from`.
+fn extract_legend(tokens: &[String], from: usize, line: usize) -> Result<String, UnidError> {
+    for i in from..tokens.len() {
+        let token = &tokens[i];
+        let value_start = token
+            .strip_prefix("legend=")
+            .or_else(|| token.strip_prefix("lg="));
+
+        if let Some(first_part) = value_start {
+            let mut parts = Vec::new();
+            if !first_part.is_empty() {
+                parts.push(first_part.to_string());
+            }
+            for t in &tokens[i + 1..] {
+                // Stop at c= or content= if it appears after lg=
+                if t.starts_with("content=") || t.starts_with("c=") {
+                    break;
+                }
+                parts.push(t.clone());
+            }
+            if parts.is_empty() {
+                return Err(UnidError::Parse {
+                    line,
+                    message: "lg= requires a value".to_string(),
+                });
+            }
+            let content = parts.join(" ");
+            let content = content.replace("\\n", "\n");
+            let content = content
+                .lines()
+                .map(|l| l.trim())
+                .collect::<Vec<_>>()
+                .join("\n");
+            return Ok(content);
+        }
+    }
+    Err(UnidError::Parse {
+        line,
+        message: "missing lg= (or legend=)".to_string(),
+    })
 }
 
 fn parse_command(tokens: &[String], line: usize) -> Result<DslCommand, UnidError> {
@@ -199,22 +245,38 @@ fn parse_rect(tokens: &[String], line: usize) -> Result<DslCommand, UnidError> {
 
     let mut rect = Rect::new(col, row, width, height);
 
-    // Parse options up to content= (content must be last)
-    let content_idx = content_token_index(tokens, 5);
+    // Parse options up to greedy tokens (c=/lg= must be last)
+    let greedy_idx = greedy_token_index(tokens, 5);
 
-    for token in &tokens[5..content_idx] {
+    // Legend-related state collected separately
+    let mut lg_pos: Option<LegendPos> = None;
+    let mut lg_overflow: Option<ContentOverflow> = None;
+    let mut lg_align: Option<ContentAlign> = None;
+
+    for token in &tokens[5..greedy_idx] {
         if let Some(v) = strip_option(token, "id") {
             validate_id(v, line)?;
             rect.id = Some(v.to_string());
         } else if let Some(v) = strip_option(token, "style").or_else(|| strip_option(token, "s")) {
             rect.style = parse_border_style(v, line)?;
-        } else if let Some(v) = strip_option(token, "overflow")
-        {
+        } else if let Some(v) = strip_option(token, "overflow") {
             rect.content_overflow = parse_content_overflow(v, line)?;
-        } else if let Some(v) =
-            strip_option(token, "align")
-        {
+        } else if let Some(v) = strip_option(token, "align") {
             rect.content_align = parse_content_align(v, line)?;
+        } else if let Some(v) = strip_option(token, "lg-pos") {
+            let pos = parse_legend_pos(v, line)?;
+            // Rect only allows top/bottom
+            if pos == LegendPos::Left || pos == LegendPos::Right {
+                return Err(UnidError::Parse {
+                    line,
+                    message: "rect lg-pos only supports top(t) or bottom(b)".to_string(),
+                });
+            }
+            lg_pos = Some(pos);
+        } else if let Some(v) = strip_option(token, "lg-overflow") {
+            lg_overflow = Some(parse_content_overflow(v, line)?);
+        } else if let Some(v) = strip_option(token, "lg-align") {
+            lg_align = Some(parse_content_align(v, line)?);
         } else {
             return Err(UnidError::Parse {
                 line,
@@ -223,10 +285,29 @@ fn parse_rect(tokens: &[String], line: usize) -> Result<DslCommand, UnidError> {
         }
     }
 
-    // Parse content if present
-    if content_idx < tokens.len() {
-        let content = extract_content(tokens, content_idx, line)?;
-        rect.content = Some(content);
+    // Parse greedy values (c= and lg=)
+    if greedy_idx < tokens.len() {
+        // Check for content
+        for i in greedy_idx..tokens.len() {
+            if tokens[i].starts_with("content=") || tokens[i].starts_with("c=") {
+                let content = extract_content(tokens, i, line)?;
+                rect.content = Some(content);
+                break;
+            }
+        }
+        // Check for legend
+        for i in greedy_idx..tokens.len() {
+            if tokens[i].starts_with("legend=") || tokens[i].starts_with("lg=") {
+                let lg_text = extract_legend(tokens, i, line)?;
+                rect.legend = Some(Legend {
+                    text: lg_text,
+                    pos: lg_pos.unwrap_or(LegendPos::Top),
+                    overflow: lg_overflow.unwrap_or_default(),
+                    align: lg_align.unwrap_or_default(),
+                });
+                break;
+            }
+        }
     }
 
     Ok(DslCommand::Object(DrawObject::Rect(rect)))
@@ -262,15 +343,45 @@ fn parse_hline(tokens: &[String], line: usize) -> Result<DslCommand, UnidError> 
     let length = parse_usize(&tokens[3], "length", line)?;
 
     let mut hline = HLine::new(col, row, length);
+    let greedy_idx = greedy_token_index(tokens, 4);
 
-    for token in &tokens[4..] {
+    let mut lg_pos: Option<LegendPos> = None;
+    let mut lg_overflow: Option<ContentOverflow> = None;
+    let mut lg_align: Option<ContentAlign> = None;
+
+    for token in &tokens[4..greedy_idx] {
         if let Some(v) = strip_option(token, "style").or_else(|| strip_option(token, "s")) {
             hline.style = parse_line_style(v, line)?;
+        } else if let Some(v) = strip_option(token, "id") {
+            validate_id(v, line)?;
+            hline.id = Some(v.to_string());
+        } else if let Some(v) = strip_option(token, "pos").or_else(|| strip_option(token, "position")) {
+            lg_pos = Some(parse_legend_pos(v, line)?);
+        } else if let Some(v) = strip_option(token, "lg-overflow") {
+            lg_overflow = Some(parse_content_overflow(v, line)?);
+        } else if let Some(v) = strip_option(token, "lg-align") {
+            lg_align = Some(parse_content_align(v, line)?);
         } else {
             return Err(UnidError::Parse {
                 line,
                 message: format!("unknown hline option '{}'", token),
             });
+        }
+    }
+
+    // Parse legend if present
+    if greedy_idx < tokens.len() {
+        for i in greedy_idx..tokens.len() {
+            if tokens[i].starts_with("legend=") || tokens[i].starts_with("lg=") {
+                let lg_text = extract_legend(tokens, i, line)?;
+                hline.legend = Some(Legend {
+                    text: lg_text,
+                    pos: lg_pos.unwrap_or(LegendPos::Top), // HLine default: Top
+                    overflow: lg_overflow.unwrap_or_default(),
+                    align: lg_align.unwrap_or_default(),
+                });
+                break;
+            }
         }
     }
 
@@ -290,15 +401,45 @@ fn parse_vline(tokens: &[String], line: usize) -> Result<DslCommand, UnidError> 
     let length = parse_usize(&tokens[3], "length", line)?;
 
     let mut vline = VLine::new(col, row, length);
+    let greedy_idx = greedy_token_index(tokens, 4);
 
-    for token in &tokens[4..] {
+    let mut lg_pos: Option<LegendPos> = None;
+    let mut lg_overflow: Option<ContentOverflow> = None;
+    let mut lg_align: Option<ContentAlign> = None;
+
+    for token in &tokens[4..greedy_idx] {
         if let Some(v) = strip_option(token, "style").or_else(|| strip_option(token, "s")) {
             vline.style = parse_line_style(v, line)?;
+        } else if let Some(v) = strip_option(token, "id") {
+            validate_id(v, line)?;
+            vline.id = Some(v.to_string());
+        } else if let Some(v) = strip_option(token, "pos").or_else(|| strip_option(token, "position")) {
+            lg_pos = Some(parse_legend_pos(v, line)?);
+        } else if let Some(v) = strip_option(token, "lg-overflow") {
+            lg_overflow = Some(parse_content_overflow(v, line)?);
+        } else if let Some(v) = strip_option(token, "lg-align") {
+            lg_align = Some(parse_content_align(v, line)?);
         } else {
             return Err(UnidError::Parse {
                 line,
                 message: format!("unknown vline option '{}'", token),
             });
+        }
+    }
+
+    // Parse legend if present
+    if greedy_idx < tokens.len() {
+        for i in greedy_idx..tokens.len() {
+            if tokens[i].starts_with("legend=") || tokens[i].starts_with("lg=") {
+                let lg_text = extract_legend(tokens, i, line)?;
+                vline.legend = Some(Legend {
+                    text: lg_text,
+                    pos: lg_pos.unwrap_or(LegendPos::Right), // VLine default: Right
+                    overflow: lg_overflow.unwrap_or_default(),
+                    align: lg_align.unwrap_or_default(),
+                });
+                break;
+            }
         }
     }
 
@@ -428,6 +569,23 @@ fn parse_content_overflow(s: &str, line: usize) -> Result<ContentOverflow, UnidE
             line,
             message: format!(
                 "unknown overflow mode '{}' (expected ellipsis, overflow, hidden, error)",
+                s
+            ),
+        }),
+    }
+}
+
+fn parse_legend_pos(s: &str, line: usize) -> Result<LegendPos, UnidError> {
+    match s.to_lowercase().as_str() {
+        "top" | "t" => Ok(LegendPos::Top),
+        "bottom" | "b" => Ok(LegendPos::Bottom),
+        "left" | "l" => Ok(LegendPos::Left),
+        "right" | "r" => Ok(LegendPos::Right),
+        "auto" | "a" => Ok(LegendPos::Auto),
+        _ => Err(UnidError::Parse {
+            line,
+            message: format!(
+                "unknown legend position '{}' (expected top/t, bottom/b, left/l, right/r, auto/a)",
                 s
             ),
         }),

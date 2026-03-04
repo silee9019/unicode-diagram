@@ -563,6 +563,89 @@ fn multiline_text_object() {
     assert!(stdout.contains("World"));
 }
 
+// ─── Legend ─────────────────────────────────────────────────────────
+
+#[test]
+fn rect_legend_top() {
+    let (stdout, _, ok) = run_stdin(
+        "canvas 14 4\n\
+         collision off\n\
+         rect 0 1 10 1 lg=Title",
+    );
+    assert!(ok);
+    assert!(stdout.contains("Title"));
+    assert!(stdout.contains("┌"));
+}
+
+#[test]
+fn rect_legend_bottom() {
+    let (stdout, _, ok) = run_stdin(
+        "canvas 14 5\n\
+         collision off\n\
+         rect 0 0 10 1 lg-pos=b lg=Footer",
+    );
+    assert!(ok);
+    assert!(stdout.contains("Footer"));
+}
+
+#[test]
+fn rect_legend_lr_error() {
+    let (_, stderr, ok) = run_stdin(
+        "canvas 20 5\n\
+         collision off\n\
+         rect 0 0 10 1 lg-pos=l lg=Bad",
+    );
+    assert!(!ok);
+    assert!(stderr.contains("lg-pos only supports top"));
+}
+
+#[test]
+fn rect_content_and_legend() {
+    let (stdout, _, ok) = run_stdin(
+        "canvas 14 4\n\
+         collision off\n\
+         rect 0 1 10 1 c=Content lg=Title",
+    );
+    assert!(ok);
+    assert!(stdout.contains("Content"));
+    assert!(stdout.contains("Title"));
+}
+
+#[test]
+fn hline_legend_top() {
+    let (stdout, _, ok) = run_stdin(
+        "canvas 15 3\n\
+         collision off\n\
+         hline 0 1 10 lg=separator",
+    );
+    assert!(ok);
+    assert!(stdout.contains("separator"));
+    assert!(stdout.contains("─"));
+}
+
+#[test]
+fn vline_legend_right() {
+    let (stdout, _, ok) = run_stdin(
+        "canvas 15 5\n\
+         collision off\n\
+         vline 0 0 4 lg=axis",
+    );
+    assert!(ok);
+    assert!(stdout.contains("axis"));
+    assert!(stdout.contains("│"));
+}
+
+#[test]
+fn hline_with_id() {
+    let (stdout, _, ok) = run_stdin(
+        "canvas 15 3\n\
+         collision off\n\
+         hline 0 1 10 id=sep",
+    );
+    assert!(ok);
+    assert!(stdout.contains("─"));
+}
+
 // ─── Rect ID ────────────────────────────────────────────────────────
 
 #[test]

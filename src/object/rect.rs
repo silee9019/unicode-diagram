@@ -50,6 +50,7 @@ pub struct Rect {
     pub style: BorderStyle,
     pub content_overflow: ContentOverflow,
     pub content_align: ContentAlign,
+    pub legend: Option<super::Legend>,
 }
 
 impl Rect {
@@ -64,6 +65,7 @@ impl Rect {
             style: BorderStyle::default(),
             content_overflow: ContentOverflow::default(),
             content_align: ContentAlign::default(),
+            legend: None,
         }
     }
 

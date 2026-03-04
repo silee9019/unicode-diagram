@@ -15,6 +15,8 @@ pub struct HLine {
     pub row: usize,
     pub length: usize,
     pub style: LineStyle,
+    pub id: Option<String>,
+    pub legend: Option<super::Legend>,
 }
 
 impl HLine {
@@ -24,6 +26,8 @@ impl HLine {
             row,
             length,
             style: LineStyle::default(),
+            id: None,
+            legend: None,
         }
     }
 }
@@ -35,6 +39,8 @@ pub struct VLine {
     pub row: usize,
     pub length: usize,
     pub style: LineStyle,
+    pub id: Option<String>,
+    pub legend: Option<super::Legend>,
 }
 
 impl VLine {
@@ -44,6 +50,8 @@ impl VLine {
             row,
             length,
             style: LineStyle::default(),
+            id: None,
+            legend: None,
         }
     }
 }

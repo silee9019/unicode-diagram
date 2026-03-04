@@ -10,6 +10,26 @@ pub use text::Text;
 
 use crate::width;
 
+/// Legend position (absolute direction relative to the object).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum LegendPos {
+    Top,
+    Bottom,
+    Left,
+    Right,
+    #[default]
+    Auto,
+}
+
+/// Legend (external label) for rect, hline, vline, arrow.
+#[derive(Debug, Clone)]
+pub struct Legend {
+    pub text: String,
+    pub pos: LegendPos,
+    pub overflow: ContentOverflow,
+    pub align: ContentAlign,
+}
+
 /// Unified enum for all drawable objects.
 #[derive(Debug, Clone)]
 pub enum DrawObject {
