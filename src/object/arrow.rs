@@ -53,8 +53,19 @@ fn side_to_incoming_dir(side: Side) -> Dir {
     }
 }
 
-/// Default gap for parallel-direction routing (ㄷ-shape, Z-shape).
+/// Default gap for self-loop and short-distance routing.
 const ROUTING_GAP: usize = 2;
+
+/// Computes adaptive gap based on Manhattan distance between endpoints.
+/// Longer distances get larger gaps to reduce crossing with other elements.
+fn adaptive_gap(sx: usize, sy: usize, ex: usize, ey: usize) -> usize {
+    let dist = sx.abs_diff(ex) + sy.abs_diff(ey);
+    match dist {
+        0..=10 => 2,
+        11..=25 => 3,
+        _ => 4,
+    }
+}
 
 /// Computes the route waypoints between two anchor points.
 ///
@@ -177,9 +188,10 @@ fn route_2bend(
             let mid_x = midpoint(sx, ex);
             vec![(sx, sy), (mid_x, sy), (mid_x, ey), (ex, ey)]
         } else {
+            let gap = adaptive_gap(sx, sy, ex, ey);
             let mid_x = match src_dir {
-                Dir::Right => sx.max(ex) + ROUTING_GAP,
-                Dir::Left => sx.min(ex).saturating_sub(ROUTING_GAP),
+                Dir::Right => sx.max(ex) + gap,
+                Dir::Left => sx.min(ex).saturating_sub(gap),
                 _ => unreachable!(),
             };
             vec![(sx, sy), (mid_x, sy), (mid_x, ey), (ex, ey)]
@@ -188,9 +200,10 @@ fn route_2bend(
         let mid_y = midpoint(sy, ey);
         vec![(sx, sy), (sx, mid_y), (ex, mid_y), (ex, ey)]
     } else {
+        let gap = adaptive_gap(sx, sy, ex, ey);
         let mid_y = match src_dir {
-            Dir::Down => sy.max(ey) + ROUTING_GAP,
-            Dir::Up => sy.min(ey).saturating_sub(ROUTING_GAP),
+            Dir::Down => sy.max(ey) + gap,
+            Dir::Up => sy.min(ey).saturating_sub(gap),
             _ => unreachable!(),
         };
         vec![(sx, sy), (sx, mid_y), (ex, mid_y), (ex, ey)]
