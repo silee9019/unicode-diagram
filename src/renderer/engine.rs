@@ -194,86 +194,89 @@ impl Renderer {
         self.canvas
             .put_char(col + inner_w + 1, row + inner_h + 1, br, self.collision, idx)?;
 
-        // Content
+        // Content (multiline support)
         if let Some(content) = &rect.content {
-            let content_w = width::str_width(content);
-            let label_row = row + 1 + inner_h / 2;
+            let lines: Vec<&str> = content.lines().collect();
+            let line_count = lines.len();
             let overflow = rect.content_overflow;
             let align = rect.content_align;
 
-            if content_w <= inner_w {
-                // Fits: apply alignment
-                let pad = match align {
-                    ContentAlign::Left => 0,
-                    ContentAlign::Center => (inner_w - content_w) / 2,
-                    ContentAlign::Right => inner_w - content_w,
-                };
-                self.canvas.put_str(
-                    col + 1 + pad,
-                    label_row,
-                    content,
-                    self.collision,
-                    idx,
-                )?;
+            // Vertical centering: place the text block in the middle of inner area
+            let start_row = if line_count <= inner_h {
+                row + 1 + (inner_h - line_count) / 2
             } else {
-                // Overflow handling
-                match overflow {
-                    ContentOverflow::Ellipsis => {
-                        let truncated =
-                            ellipsis_truncate(content, content_w, inner_w, align);
-                        self.canvas.put_str(
-                            col + 1,
-                            label_row,
-                            &truncated,
-                            self.collision,
-                            idx,
-                        )?;
-                    }
-                    ContentOverflow::Overflow => {
-                        // Write content starting based on alignment, overwriting borders
-                        let start_col = match align {
-                            ContentAlign::Left => col + 1,
-                            ContentAlign::Center => {
-                                let center = col + 1 + inner_w / 2;
-                                center.saturating_sub(content_w / 2)
-                            }
-                            ContentAlign::Right => (col + 1 + inner_w).saturating_sub(content_w),
-                        };
-                        self.canvas.put_str(
-                            start_col,
-                            label_row,
-                            content,
-                            false, // overflow ignores collision for content
-                            idx,
-                        )?;
-                    }
-                    ContentOverflow::Hidden => {
-                        let truncated = hidden_truncate(content, inner_w, align);
-                        self.canvas.put_str(
-                            col + 1,
-                            label_row,
-                            &truncated,
-                            self.collision,
-                            idx,
-                        )?;
-                    }
-                    ContentOverflow::Error => {
-                        return Err(UnidError::LabelOverflow {
-                            label: content.clone(),
-                            label_width: content_w,
-                            inner_width: inner_w,
-                        });
-                    }
+                row + 1
+            };
+
+            for (i, line) in lines.iter().enumerate() {
+                let r = start_row + i;
+                if r > row + inner_h {
+                    break; // Exceeds inner area
                 }
+                self.render_content_line(col, r, line, inner_w, overflow, align, idx)?;
             }
         }
 
         Ok(())
     }
 
+    /// Renders a single line of content into the canvas at (col+1..col+inner_w, row).
+    /// Handles overflow (Ellipsis/Hidden/Error) and alignment (Left/Center/Right).
+    fn render_content_line(
+        &mut self,
+        col: usize,
+        row: usize,
+        line: &str,
+        inner_w: usize,
+        overflow: ContentOverflow,
+        align: ContentAlign,
+        idx: usize,
+    ) -> Result<(), UnidError> {
+        let content_w = width::str_width(line);
+
+        let display = if content_w <= inner_w {
+            line.to_string()
+        } else {
+            match overflow {
+                ContentOverflow::Ellipsis => {
+                    ellipsis_truncate(line, content_w, inner_w, align)
+                }
+                ContentOverflow::Overflow => line.to_string(),
+                ContentOverflow::Hidden => {
+                    hidden_truncate(line, inner_w, align)
+                }
+                ContentOverflow::Error => {
+                    return Err(UnidError::LabelOverflow {
+                        label: line.to_string(),
+                        label_width: content_w,
+                        inner_width: inner_w,
+                    });
+                }
+            }
+        };
+
+        let display_w = width::str_width(&display);
+        let pad_left = match align {
+            ContentAlign::Left => 0,
+            ContentAlign::Center => (inner_w.saturating_sub(display_w)) / 2,
+            ContentAlign::Right => inner_w.saturating_sub(display_w),
+        };
+
+        self.canvas.put_str(
+            col + 1 + pad_left,
+            row,
+            &display,
+            false,
+            idx,
+        )
+    }
+
     fn draw_text(&mut self, text: &Text, idx: usize) -> Result<(), UnidError> {
-        self.canvas
-            .put_str(text.col, text.row, &text.content, self.collision, idx)
+        for (i, line) in text.content.lines().enumerate() {
+            self.canvas
+                .put_str(text.col, text.row + i, line, self.collision, idx)?;
+        }
+        Ok(())
     }
 
     fn draw_hline(&mut self, hline: &HLine, idx: usize) -> Result<(), UnidError> {
@@ -796,6 +799,31 @@ mod tests {
         assert!(result.contains('└'));
         assert!(result.contains('┘'));
         assert!(result.contains('↑'));
+    }
+
+    #[test]
+    fn render_rect_multiline_content() {
+        let mut rect = Rect::new(0, 0, 6, 3);
+        rect.content = Some("AA\nBB".to_string());
+        rect.content_align = ContentAlign::Center;
+        let result = render_objects(8, 5, &[DrawObject::Rect(rect)], false);
+        // inner_h=3, 2 lines → start_row=0+1+(3-2)/2=1, lines at rows 1,2
+        assert_eq!(
+            result,
+            "\
+┌──────┐\n\
+│  AA  │\n\
+│  BB  │\n\
+│      │\n\
+└──────┘"
+        );
+    }
+
+    #[test]
+    fn render_text_multiline() {
+        let text = Text::new(0, 0, "Hello\nWorld");
+        let result = render_objects(5, 2, &[DrawObject::Text(text)], false);
+        assert_eq!(result, "Hello\nWorld");
     }
 
     #[test]

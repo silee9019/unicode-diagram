@@ -70,6 +70,12 @@ fn extract_content(tokens: &[String], from: usize, line: usize) -> Result<String
             let content = parts.join(" ");
             // Unescape \n to actual newlines
             let content = content.replace("\\n", "\n");
+            // Trim leading/trailing whitespace from each line
+            let content = content
+                .lines()
+                .map(|l| l.trim())
+                .collect::<Vec<_>>()
+                .join("\n");
             return Ok(content);
         }
     }

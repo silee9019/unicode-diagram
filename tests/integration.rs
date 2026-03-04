@@ -524,14 +524,43 @@ fn shorthand_style() {
 #[test]
 fn content_with_newline_escape() {
     // \n in content is unescaped to a real newline by the parser.
-    // Current renderer places content on a single row, so only the first
-    // line fragment appears.  This test verifies the escape doesn't crash.
-    let (_, _, ok) = run_stdin(
+    // Multiline content renders each line on a separate row.
+    let (stdout, _, ok) = run_stdin(
         "canvas 12 5\n\
          collision off\n\
          rect 0 0 10 3 c=Line1\\nLine2",
     );
     assert!(ok);
+    assert!(stdout.contains("Line1"));
+    assert!(stdout.contains("Line2"));
+}
+
+#[test]
+fn multiline_rect_vertical_center() {
+    // 2 lines in inner_h=3 → vertically centered
+    let (stdout, _, ok) = run_stdin(
+        "canvas 10 5\n\
+         collision off\n\
+         rect 0 0 8 3 align=c c=AA\\nBB",
+    );
+    assert!(ok);
+    // inner_h=3, line_count=2, start_row = 0+1+(3-2)/2 = 1+0 = 1
+    // But (3-2)/2 = 0, so lines are at rows 1 and 2 (top of inner area)
+    // Actually: start_row = row+1 + (3-2)/2 = 1+0 = 1
+    assert!(stdout.contains("AA"));
+    assert!(stdout.contains("BB"));
+}
+
+#[test]
+fn multiline_text_object() {
+    let (stdout, _, ok) = run_stdin(
+        "canvas 10 3\n\
+         collision off\n\
+         text 0 0 c=Hello\\nWorld",
+    );
+    assert!(ok);
+    assert!(stdout.contains("Hello"));
+    assert!(stdout.contains("World"));
 }
 
 // ─── Rect ID ────────────────────────────────────────────────────────

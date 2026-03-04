@@ -25,7 +25,11 @@ impl DrawObject {
     pub fn bounds(&self) -> (usize, usize) {
         match self {
             DrawObject::Rect(r) => (r.col + r.outer_width(), r.row + r.outer_height()),
-            DrawObject::Text(t) => (t.col + width::str_width(&t.content), t.row + 1),
+            DrawObject::Text(t) => {
+                let max_w = t.content.lines().map(width::str_width).max().unwrap_or(0);
+                let line_count = t.content.lines().count().max(1);
+                (t.col + max_w, t.row + line_count)
+            }
             DrawObject::HLine(h) => (h.col + h.length, h.row + 1),
             DrawObject::VLine(v) => (v.col + 1, v.row + v.length),
             DrawObject::Arrow(a) => {
