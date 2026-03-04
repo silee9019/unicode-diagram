@@ -5,7 +5,7 @@ pub mod text;
 
 pub use arrow::Arrow;
 pub use line::{HLine, LineStyle, VLine};
-pub use rect::{BorderStyle, Rect};
+pub use rect::{BorderStyle, ContentAlign, ContentOverflow, Rect};
 pub use text::Text;
 
 use crate::width;
@@ -58,11 +58,28 @@ impl DrawObject {
         }
     }
 
+    /// Short description for collision error messages.
+    pub fn collision_desc(&self) -> String {
+        match self {
+            DrawObject::Rect(r) => {
+                format!("rect at ({},{}) {}x{}", r.col, r.row, r.outer_width(), r.outer_height())
+            }
+            DrawObject::Text(t) => {
+                format!("text at ({},{}) w={}", t.col, t.row, width::str_width(&t.content))
+            }
+            DrawObject::HLine(h) => format!("hline at ({},{}) len={}", h.col, h.row, h.length),
+            DrawObject::VLine(v) => format!("vline at ({},{}) len={}", v.col, v.row, v.length),
+            DrawObject::Arrow(a) => {
+                format!("arrow ({},{})->({},{})", a.from_col, a.from_row, a.to_col, a.to_row)
+            }
+        }
+    }
+
     /// Returns a summary string for list display.
     pub fn summary(&self) -> String {
         match self {
             DrawObject::Rect(r) => {
-                let label = r.label.as_deref().unwrap_or("");
+                let content = r.content.as_deref().unwrap_or("");
                 format!(
                     "rect ({},{}) {}x{} {:?}{}",
                     r.col,
@@ -70,10 +87,10 @@ impl DrawObject {
                     r.width,
                     r.height,
                     r.style,
-                    if label.is_empty() {
+                    if content.is_empty() {
                         String::new()
                     } else {
-                        format!(" \"{}\"", label)
+                        format!(" \"{}\"", content)
                     }
                 )
             }

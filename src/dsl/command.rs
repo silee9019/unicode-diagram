@@ -1,12 +1,16 @@
+use crate::object::rect::{BorderStyle, ContentAlign, ContentOverflow};
 use crate::object::DrawObject;
 
 /// Represents a parsed DSL command.
 #[derive(Debug)]
 pub enum DslCommand {
-    /// Canvas size declaration.
+    /// Canvas size declaration with optional border and global defaults.
     Canvas {
         width: CanvasSize,
         height: CanvasSize,
+        border: Option<BorderStyle>,
+        content_overflow: Option<ContentOverflow>,
+        content_align: Option<ContentAlign>,
     },
     /// Collision mode declaration.
     Collision(bool),

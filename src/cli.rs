@@ -4,39 +4,23 @@ use clap::{Parser, Subcommand, ValueEnum};
 #[command(name = "unid", about = "Unicode box-drawing diagram renderer")]
 pub struct Cli {
     #[command(subcommand)]
-    pub command: Commands,
+    pub command: Option<Commands>,
+
+    /// Collision mode (overrides DSL declaration)
+    #[arg(long, value_enum)]
+    pub collision: Option<CollisionMode>,
 }
 
 #[derive(Subcommand)]
 pub enum Commands {
-    /// Render a diagram from DSL input
-    Render {
-        /// Read DSL from file
-        #[arg(short, long)]
-        file: Option<String>,
-
-        /// Read DSL from inline string (comma-separated)
-        #[arg(short, long)]
-        inline: Option<String>,
-
-        /// Collision mode (overrides DSL declaration)
-        #[arg(long, value_enum)]
-        collision: Option<CollisionMode>,
-    },
-
-    /// List objects in a diagram
-    List {
-        /// Read DSL from file
-        #[arg(short, long)]
-        file: Option<String>,
-
-        /// Read DSL from inline string (comma-separated)
-        #[arg(short, long)]
-        inline: Option<String>,
-    },
+    /// List objects in a diagram (stdin)
+    List,
 
     /// Show comprehensive usage guide with examples
     Guide,
+
+    /// Lint DSL input for errors and warnings (stdin)
+    Lint,
 }
 
 #[derive(Debug, Clone, Copy, ValueEnum)]

@@ -8,7 +8,26 @@ pub enum BorderStyle {
     Rounded,
 }
 
-/// A rectangle with optional label.
+/// Content overflow mode.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum ContentOverflow {
+    #[default]
+    Ellipsis,
+    Overflow,
+    Hidden,
+    Error,
+}
+
+/// Content alignment within rect.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum ContentAlign {
+    #[default]
+    Left,
+    Center,
+    Right,
+}
+
+/// A rectangle with optional content.
 #[derive(Debug, Clone)]
 pub struct Rect {
     pub col: usize,
@@ -17,8 +36,10 @@ pub struct Rect {
     pub width: usize,
     /// Inner height (excluding borders).
     pub height: usize,
-    pub label: Option<String>,
+    pub content: Option<String>,
     pub style: BorderStyle,
+    pub content_overflow: ContentOverflow,
+    pub content_align: ContentAlign,
 }
 
 impl Rect {
@@ -28,8 +49,10 @@ impl Rect {
             row,
             width,
             height,
-            label: None,
+            content: None,
             style: BorderStyle::default(),
+            content_overflow: ContentOverflow::default(),
+            content_align: ContentAlign::default(),
         }
     }
 

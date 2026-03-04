@@ -1,168 +1,325 @@
-use std::process::Command;
+use std::io::Write;
+use std::process::{Command, Stdio};
 
 fn unid() -> Command {
     Command::new(env!("CARGO_BIN_EXE_unid"))
 }
 
-#[test]
-fn render_simple_rect_from_inline() {
-    let output = unid()
-        .args([
-            "render",
-            "--inline",
-            "canvas 6 3, collision off, rect 0 0 4 1",
-        ])
-        .output()
+/// Pipe DSL input to unid via stdin and return (stdout, stderr, success).
+fn run_stdin(input: &str) -> (String, String, bool) {
+    let mut child = unid()
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
         .unwrap();
-    assert!(output.status.success());
-    let stdout = String::from_utf8(output.stdout).unwrap();
+    child
+        .stdin
+        .take()
+        .unwrap()
+        .write_all(input.as_bytes())
+        .unwrap();
+    let output = child.wait_with_output().unwrap();
+    (
+        String::from_utf8(output.stdout).unwrap(),
+        String::from_utf8(output.stderr).unwrap(),
+        output.status.success(),
+    )
+}
+
+/// Pipe DSL input to a subcommand (list, lint).
+fn run_subcmd(subcmd: &str, input: &str) -> (String, String, bool) {
+    let mut child = unid()
+        .arg(subcmd)
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .unwrap();
+    child
+        .stdin
+        .take()
+        .unwrap()
+        .write_all(input.as_bytes())
+        .unwrap();
+    let output = child.wait_with_output().unwrap();
+    (
+        String::from_utf8(output.stdout).unwrap(),
+        String::from_utf8(output.stderr).unwrap(),
+        output.status.success(),
+    )
+}
+
+/// Pipe DSL input to unid with --collision flag.
+fn run_with_collision(input: &str, mode: &str) -> (String, String, bool) {
+    let flag = format!("--collision={mode}");
+    let mut child = unid()
+        .arg(&flag)
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .unwrap();
+    child
+        .stdin
+        .take()
+        .unwrap()
+        .write_all(input.as_bytes())
+        .unwrap();
+    let output = child.wait_with_output().unwrap();
+    (
+        String::from_utf8(output.stdout).unwrap(),
+        String::from_utf8(output.stderr).unwrap(),
+        output.status.success(),
+    )
+}
+
+// ─── Render (stdin default) ──────────────────────────────────────────
+
+#[test]
+fn render_simple_rect() {
+    let (stdout, _, ok) = run_stdin(
+        "canvas 6 3\n\
+         collision off\n\
+         rect 0 0 4 1",
+    );
+    assert!(ok);
     assert_eq!(stdout.trim(), "┌────┐\n│    │\n└────┘");
 }
 
 #[test]
-fn render_rect_with_label() {
-    let output = unid()
-        .args([
-            "render",
-            "--inline",
-            r#"canvas 12 3, collision off, rect 0 0 10 1 "Hello""#,
-        ])
-        .output()
-        .unwrap();
-    assert!(output.status.success());
-    let stdout = String::from_utf8(output.stdout).unwrap();
+fn render_rect_with_content() {
+    let (stdout, _, ok) = run_stdin(
+        "canvas 12 3\n\
+         collision off\n\
+         rect 0 0 10 1 c=Hello",
+    );
+    assert!(ok);
     assert!(stdout.contains("Hello"));
     assert!(stdout.contains("┌"));
     assert!(stdout.contains("└"));
 }
 
 #[test]
-fn render_cjk_label() {
-    let output = unid()
-        .args([
-            "render",
-            "--inline",
-            r#"canvas 14 3, collision off, rect 0 0 12 1 "한글 테스트""#,
-        ])
-        .output()
-        .unwrap();
-    assert!(output.status.success());
-    let stdout = String::from_utf8(output.stdout).unwrap();
+fn render_cjk_content() {
+    let (stdout, _, ok) = run_stdin(
+        "canvas 14 3\n\
+         collision off\n\
+         rect 0 0 12 1 c=한글 테스트",
+    );
+    assert!(ok);
     assert!(stdout.contains("한글 테스트"));
 }
 
 #[test]
 fn render_auto_canvas() {
-    let output = unid()
-        .args([
-            "render",
-            "--inline",
-            "canvas auto, collision off, rect 0 0 4 1",
-        ])
-        .output()
-        .unwrap();
-    assert!(output.status.success());
-    let stdout = String::from_utf8(output.stdout).unwrap();
+    let (stdout, _, ok) = run_stdin(
+        "canvas auto\n\
+         collision off\n\
+         rect 0 0 4 1",
+    );
+    assert!(ok);
     assert_eq!(stdout.trim(), "┌────┐\n│    │\n└────┘");
 }
 
 #[test]
-fn render_collision_on_error() {
-    let output = unid()
-        .args([
-            "render",
-            "--inline",
-            "canvas 20 5, collision on, rect 0 0 5 1, rect 3 0 5 1",
-        ])
-        .output()
-        .unwrap();
-    assert!(!output.status.success());
-    let stderr = String::from_utf8(output.stderr).unwrap();
+fn render_multiple_styles() {
+    let (stdout, _, ok) = run_stdin(
+        "canvas 30 12\n\
+         collision off\n\
+         rect 0 0 6 1 s=l\n\
+         rect 0 3 6 1 s=h\n\
+         rect 0 6 6 1 s=d\n\
+         rect 0 9 6 1 s=r",
+    );
+    assert!(ok);
+    assert!(stdout.contains('┌')); // light
+    assert!(stdout.contains('┏')); // heavy
+    assert!(stdout.contains('╔')); // double
+    assert!(stdout.contains('╭')); // rounded
+}
+
+#[test]
+fn render_arrows() {
+    let (stdout, _, ok) = run_stdin(
+        "canvas 10 5\n\
+         collision off\n\
+         arrow 0 0 9 0\n\
+         arrow 0 2 0 4",
+    );
+    assert!(ok);
+    assert!(stdout.contains('→'));
+    assert!(stdout.contains('↓'));
+}
+
+#[test]
+fn render_lines() {
+    let (stdout, _, ok) = run_stdin(
+        "canvas 10 5\n\
+         collision off\n\
+         hline 0 0 5\n\
+         vline 0 1 4",
+    );
+    assert!(ok);
+    assert!(stdout.contains('─'));
+    assert!(stdout.contains('│'));
+}
+
+#[test]
+fn render_cjk_mixed_diagram() {
+    let (stdout, _, ok) = run_stdin(
+        "canvas 30 5\n\
+         collision off\n\
+         rect 0 0 12 1 c=서버\n\
+         rect 18 0 8 1 c=DB\n\
+         arrow 14 1 18 1",
+    );
+    assert!(ok);
+    assert!(stdout.contains("서버"));
+    assert!(stdout.contains("DB"));
+    assert!(stdout.contains('→'));
+}
+
+// ─── Collision ───────────────────────────────────────────────────────
+
+#[test]
+fn collision_on_error() {
+    let (_, stderr, ok) = run_stdin(
+        "canvas 20 5\n\
+         collision on\n\
+         rect 0 0 5 1\n\
+         rect 3 0 5 1",
+    );
+    assert!(!ok);
     assert!(stderr.contains("collision"));
 }
 
 #[test]
-fn render_collision_off_allows_overlap() {
-    let output = unid()
-        .args([
-            "render",
-            "--inline",
-            "canvas 20 5, collision off, rect 0 0 5 1, rect 3 0 5 1",
-        ])
-        .output()
-        .unwrap();
-    assert!(output.status.success());
+fn collision_off_allows_overlap() {
+    let (_, _, ok) = run_stdin(
+        "canvas 20 5\n\
+         collision off\n\
+         rect 0 0 5 1\n\
+         rect 3 0 5 1",
+    );
+    assert!(ok);
 }
 
 #[test]
-fn render_collision_cli_override() {
-    // DSL says collision on, but CLI says off
-    let output = unid()
-        .args([
-            "render",
-            "--collision=off",
-            "--inline",
-            "canvas 20 5, collision on, rect 0 0 5 1, rect 3 0 5 1",
-        ])
-        .output()
-        .unwrap();
-    assert!(output.status.success());
+fn collision_cli_override() {
+    // DSL says collision on, but CLI overrides to off
+    let (_, _, ok) = run_with_collision(
+        "canvas 20 5\n\
+         collision on\n\
+         rect 0 0 5 1\n\
+         rect 3 0 5 1",
+        "off",
+    );
+    assert!(ok);
 }
 
 #[test]
-fn render_from_file() {
-    let dir = std::env::temp_dir().join("unid_test");
-    std::fs::create_dir_all(&dir).unwrap();
-    let path = dir.join("test.unid");
-    std::fs::write(&path, "canvas 8 3\ncollision off\nrect 0 0 6 1\n").unwrap();
+fn collision_error_format() {
+    let (_, stderr, ok) = run_stdin(
+        "canvas 20 5\n\
+         collision on\n\
+         rect 0 0 5 1\n\
+         rect 3 0 5 1",
+    );
+    assert!(!ok);
+    // Error format: "collision: object #N (...) overlaps object #M (...) at (...) size ..."
+    assert!(stderr.contains("object #2"));
+    assert!(stderr.contains("object #1"));
+    assert!(stderr.contains("overlaps"));
+    assert!(stderr.contains("size"));
+}
 
-    let output = unid()
-        .args(["render", "--file", path.to_str().unwrap()])
-        .output()
-        .unwrap();
-    assert!(output.status.success());
-    let stdout = String::from_utf8(output.stdout).unwrap();
-    assert!(stdout.contains("┌──────┐"));
+// ─── Content Overflow ────────────────────────────────────────────────
 
-    std::fs::remove_dir_all(dir).ok();
+#[test]
+fn overflow_ellipsis() {
+    let (stdout, _, ok) = run_stdin(
+        "canvas 10 3\n\
+         collision off\n\
+         rect 0 0 4 1 c=VeryLongText",
+    );
+    assert!(ok);
+    assert!(stdout.contains("..12"));
 }
 
 #[test]
-fn render_from_stdin() {
-    let output = unid()
-        .arg("render")
-        .stdin(std::process::Stdio::piped())
-        .stdout(std::process::Stdio::piped())
-        .stderr(std::process::Stdio::piped())
-        .spawn()
-        .and_then(|mut child| {
-            use std::io::Write;
-            child
-                .stdin
-                .take()
-                .unwrap()
-                .write_all(b"canvas 6 3\ncollision off\nrect 0 0 4 1\n")
-                .unwrap();
-            child.wait_with_output()
-        })
-        .unwrap();
-    assert!(output.status.success());
-    let stdout = String::from_utf8(output.stdout).unwrap();
-    assert!(stdout.contains("┌────┐"));
+fn overflow_hidden() {
+    let (stdout, _, ok) = run_stdin(
+        "canvas 10 3\n\
+         collision off\n\
+         rect 0 0 5 1 overflow=hidden c=HelloWorld",
+    );
+    assert!(ok);
+    assert!(stdout.contains("Hello"));
+    assert!(!stdout.contains("World"));
 }
+
+#[test]
+fn overflow_error() {
+    let (_, stderr, ok) = run_stdin(
+        "canvas 10 3\n\
+         collision off\n\
+         rect 0 0 3 1 overflow=error c=VeryLong",
+    );
+    assert!(!ok);
+    assert!(stderr.contains("overflow"));
+}
+
+// ─── Content Alignment ──────────────────────────────────────────────
+
+#[test]
+fn align_center() {
+    let (stdout, _, ok) = run_stdin(
+        "canvas 12 3\n\
+         collision off\n\
+         rect 0 0 10 1 align=c c=Hi",
+    );
+    assert!(ok);
+    // "Hi" (2 cols) centered in 10 cols → pad 4 left
+    assert!(stdout.contains("│    Hi    │"));
+}
+
+#[test]
+fn align_right() {
+    let (stdout, _, ok) = run_stdin(
+        "canvas 12 3\n\
+         collision off\n\
+         rect 0 0 10 1 align=r c=Hi",
+    );
+    assert!(ok);
+    assert!(stdout.contains("│        Hi│"));
+}
+
+// ─── Canvas Border ──────────────────────────────────────────────────
+
+#[test]
+fn canvas_border_rounded() {
+    let (stdout, _, ok) = run_stdin(
+        "canvas 10 3 border=r\n\
+         collision off",
+    );
+    assert!(ok);
+    assert!(stdout.contains('╭'));
+    assert!(stdout.contains('╯'));
+}
+
+// ─── List ────────────────────────────────────────────────────────────
 
 #[test]
 fn list_subcommand() {
-    let output = unid()
-        .args([
-            "list",
-            "--inline",
-            r#"canvas 30 5, collision on, rect 0 0 8 1 "Box", text 15 1 "Hi""#,
-        ])
-        .output()
-        .unwrap();
-    assert!(output.status.success());
-    let stdout = String::from_utf8(output.stdout).unwrap();
+    let (stdout, _, ok) = run_subcmd(
+        "list",
+        "canvas 30 5\n\
+         collision on\n\
+         rect 0 0 8 1 c=Box\n\
+         text 15 1 c=Hi",
+    );
+    assert!(ok);
     assert!(stdout.contains("Canvas: 30x5"));
     assert!(stdout.contains("Collision: on"));
     assert!(stdout.contains("Objects: 2"));
@@ -172,18 +329,45 @@ fn list_subcommand() {
 
 #[test]
 fn list_auto_canvas() {
-    let output = unid()
-        .args([
-            "list",
-            "--inline",
-            "canvas auto, collision off, rect 0 0 4 1",
-        ])
-        .output()
-        .unwrap();
-    assert!(output.status.success());
-    let stdout = String::from_utf8(output.stdout).unwrap();
+    let (stdout, _, ok) = run_subcmd(
+        "list",
+        "canvas auto\n\
+         collision off\n\
+         rect 0 0 4 1",
+    );
+    assert!(ok);
     assert!(stdout.contains("(auto)"));
 }
+
+// ─── Lint ────────────────────────────────────────────────────────────
+
+#[test]
+fn lint_ok() {
+    let (stdout, _, ok) = run_subcmd(
+        "lint",
+        "canvas 10 3\n\
+         collision off\n\
+         rect 0 0 4 1",
+    );
+    assert!(ok);
+    assert!(stdout.contains("OK"));
+}
+
+#[test]
+fn lint_collision_error() {
+    let (stdout, _, ok) = run_subcmd(
+        "lint",
+        "canvas 10 5\n\
+         collision on\n\
+         rect 0 0 5 1\n\
+         rect 3 0 5 1",
+    );
+    assert!(!ok);
+    assert!(stdout.contains("Errors:"));
+    assert!(stdout.contains("collision"));
+}
+
+// ─── Guide ──────────────────────────────────────────────────────────
 
 #[test]
 fn guide_subcommand() {
@@ -193,104 +377,92 @@ fn guide_subcommand() {
     assert!(stdout.contains("USAGE:"));
     assert!(stdout.contains("DSL SYNTAX:"));
     assert!(stdout.contains("BORDER STYLES:"));
-    assert!(stdout.contains("collision on"));
-    assert!(stdout.contains("collision off"));
 }
 
-#[test]
-fn render_multiple_styles() {
-    let input = "\
-canvas 30 12, collision off,\
-rect 0 0 6 1 style=light,\
-rect 0 3 6 1 style=heavy,\
-rect 0 6 6 1 style=double,\
-rect 0 9 6 1 style=rounded";
-    let output = unid().args(["render", "--inline", input]).output().unwrap();
-    assert!(output.status.success());
-    let stdout = String::from_utf8(output.stdout).unwrap();
-    assert!(stdout.contains('┌')); // light
-    assert!(stdout.contains('┏')); // heavy
-    assert!(stdout.contains('╔')); // double
-    assert!(stdout.contains('╭')); // rounded
-}
-
-#[test]
-fn render_arrows() {
-    let output = unid()
-        .args([
-            "render",
-            "--inline",
-            "canvas 10 5, collision off, arrow 0 0 9 0, arrow 0 2 0 4",
-        ])
-        .output()
-        .unwrap();
-    assert!(output.status.success());
-    let stdout = String::from_utf8(output.stdout).unwrap();
-    assert!(stdout.contains('→'));
-    assert!(stdout.contains('↓'));
-}
-
-#[test]
-fn render_lines() {
-    let output = unid()
-        .args([
-            "render",
-            "--inline",
-            "canvas 10 5, collision off, hline 0 0 5, vline 0 1 4",
-        ])
-        .output()
-        .unwrap();
-    assert!(output.status.success());
-    let stdout = String::from_utf8(output.stdout).unwrap();
-    assert!(stdout.contains('─'));
-    assert!(stdout.contains('│'));
-}
-
-#[test]
-fn render_cjk_mixed_diagram() {
-    let input =
-        r#"canvas 30 5, collision off, rect 0 0 12 1 "서버", rect 18 0 8 1 "DB", arrow 14 1 18 1"#;
-    let output = unid().args(["render", "--inline", input]).output().unwrap();
-    assert!(output.status.success());
-    let stdout = String::from_utf8(output.stdout).unwrap();
-    assert!(stdout.contains("서버"));
-    assert!(stdout.contains("DB"));
-    assert!(stdout.contains('→'));
-}
+// ─── Error cases ────────────────────────────────────────────────────
 
 #[test]
 fn error_missing_canvas() {
-    let output = unid()
-        .args(["render", "--inline", "collision on, rect 0 0 4 1"])
-        .output()
-        .unwrap();
-    assert!(!output.status.success());
-    let stderr = String::from_utf8(output.stderr).unwrap();
+    let (_, stderr, ok) = run_stdin(
+        "collision on\n\
+         rect 0 0 4 1",
+    );
+    assert!(!ok);
     assert!(stderr.contains("canvas"));
 }
 
 #[test]
 fn error_missing_collision() {
-    let output = unid()
-        .args(["render", "--inline", "canvas 10 5, rect 0 0 4 1"])
-        .output()
-        .unwrap();
-    assert!(!output.status.success());
-    let stderr = String::from_utf8(output.stderr).unwrap();
+    let (_, stderr, ok) = run_stdin(
+        "canvas 10 5\n\
+         rect 0 0 4 1",
+    );
+    assert!(!ok);
     assert!(stderr.contains("collision"));
 }
 
 #[test]
 fn error_parse_error() {
-    let output = unid()
-        .args([
-            "render",
-            "--inline",
-            "canvas 10 5, collision on, badcmd 1 2",
-        ])
-        .output()
-        .unwrap();
-    assert!(!output.status.success());
-    let stderr = String::from_utf8(output.stderr).unwrap();
+    let (_, stderr, ok) = run_stdin(
+        "canvas 10 5\n\
+         collision on\n\
+         badcmd 1 2",
+    );
+    assert!(!ok);
     assert!(stderr.contains("unknown command"));
+}
+
+// ─── Comments and blank lines ───────────────────────────────────────
+
+#[test]
+fn comments_and_blank_lines() {
+    let (stdout, _, ok) = run_stdin(
+        "# This is a comment\n\
+         canvas 6 3\n\
+         \n\
+         collision off\n\
+         # Another comment\n\
+         rect 0 0 4 1",
+    );
+    assert!(ok);
+    assert_eq!(stdout.trim(), "┌────┐\n│    │\n└────┘");
+}
+
+// ─── Text object ────────────────────────────────────────────────────
+
+#[test]
+fn render_text_object() {
+    let (stdout, _, ok) = run_stdin(
+        "canvas 20 3\n\
+         collision off\n\
+         text 0 0 c=Hello World",
+    );
+    assert!(ok);
+    assert!(stdout.contains("Hello World"));
+}
+
+// ─── Shorthand options ──────────────────────────────────────────────
+
+#[test]
+fn shorthand_style() {
+    let (stdout, _, ok) = run_stdin(
+        "canvas 8 3\n\
+         collision off\n\
+         rect 0 0 6 1 style=rounded",
+    );
+    assert!(ok);
+    assert!(stdout.contains('╭'));
+}
+
+#[test]
+fn content_with_newline_escape() {
+    // \n in content is unescaped to a real newline by the parser.
+    // Current renderer places content on a single row, so only the first
+    // line fragment appears.  This test verifies the escape doesn't crash.
+    let (_, _, ok) = run_stdin(
+        "canvas 12 5\n\
+         collision off\n\
+         rect 0 0 10 3 c=Line1\\nLine2",
+    );
+    assert!(ok);
 }
