@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::io::{self, IsTerminal, Read};
 use std::process;
 
@@ -7,8 +8,9 @@ use unicode_diagram::cli::{Cli, CollisionMode, Commands};
 use unicode_diagram::dsl::command::{CanvasSize, DslCommand};
 use unicode_diagram::dsl::parse;
 use unicode_diagram::error::UnidError;
-use unicode_diagram::object::rect::{BorderStyle, ContentAlign, ContentOverflow};
-use unicode_diagram::object::DrawObject;
+use unicode_diagram::object::arrow::{compute_route, ResolvedArrow};
+use unicode_diagram::object::rect::{BorderStyle, ContentAlign, ContentOverflow, Side};
+use unicode_diagram::object::{DrawObject, Rect};
 use unicode_diagram::renderer::Renderer;
 
 fn main() {
@@ -45,6 +47,12 @@ fn read_stdin() -> Result<String, UnidError> {
     Ok(buf)
 }
 
+/// A slot in the draw order: either a resolved object or a pending arrow.
+enum DrawSlot {
+    Ready(DrawObject),
+    PendingArrow,
+}
+
 struct CanvasConfig {
     width: CanvasSize,
     height: CanvasSize,
@@ -65,7 +73,10 @@ fn process_commands(
     let mut global_overflow = ContentOverflow::default();
     let mut global_align = ContentAlign::default();
     let mut collision = None;
-    let mut objects = Vec::new();
+    // Slots preserve DSL ordering: arrows start as PendingArrow and get
+    // replaced with resolved DrawObjects after all rects are collected.
+    let mut slots: Vec<DrawSlot> = Vec::new();
+    let mut arrow_slots: Vec<(usize, String, Side, String, Side, usize)> = Vec::new();
 
     for cmd in commands {
         match cmd {
@@ -90,7 +101,18 @@ fn process_commands(
                 collision = Some(v);
             }
             DslCommand::Object(obj) => {
-                objects.push(obj);
+                slots.push(DrawSlot::Ready(obj));
+            }
+            DslCommand::Arrow {
+                src_id,
+                src_side,
+                dst_id,
+                dst_side,
+                line,
+            } => {
+                let idx = slots.len();
+                slots.push(DrawSlot::PendingArrow);
+                arrow_slots.push((idx, src_id, src_side, dst_id, dst_side, line));
             }
         }
     }
@@ -105,6 +127,17 @@ fn process_commands(
         None => coll_dsl,
     };
 
+    // Resolve arrows and fill PendingArrow slots
+    resolve_arrows_into_slots(&mut slots, &arrow_slots)?;
+
+    let objects: Vec<DrawObject> = slots
+        .into_iter()
+        .filter_map(|slot| match slot {
+            DrawSlot::Ready(obj) => Some(obj),
+            DrawSlot::PendingArrow => None, // Should not happen after resolution
+        })
+        .collect();
+
     Ok(CanvasConfig {
         width: cw,
         height: ch,
@@ -114,6 +147,47 @@ fn process_commands(
         collision: coll,
         objects,
     })
+}
+
+/// Resolves unresolved arrows and fills their reserved slots.
+fn resolve_arrows_into_slots(
+    slots: &mut [DrawSlot],
+    arrow_slots: &[(usize, String, Side, String, Side, usize)],
+) -> Result<(), UnidError> {
+    // Phase 1: Build ID → Rect data mapping (clone to avoid borrow conflicts)
+    let mut id_anchors: HashMap<String, Rect> = HashMap::new();
+    for slot in slots.iter() {
+        if let DrawSlot::Ready(DrawObject::Rect(r)) = slot
+            && let Some(id) = &r.id
+        {
+            if id_anchors.contains_key(id) {
+                return Err(UnidError::Parse {
+                    line: 0,
+                    message: format!("duplicate object id '{}'", id),
+                });
+            }
+            id_anchors.insert(id.clone(), r.clone());
+        }
+    }
+
+    // Phase 2: Resolve each arrow and replace PendingArrow slots
+    for (idx, src_id, src_side, dst_id, dst_side, line) in arrow_slots {
+        let src_rect = id_anchors.get(src_id).ok_or_else(|| UnidError::Parse {
+            line: *line,
+            message: format!("unknown object id '{}' in arrow source", src_id),
+        })?;
+        let dst_rect = id_anchors.get(dst_id).ok_or_else(|| UnidError::Parse {
+            line: *line,
+            message: format!("unknown object id '{}' in arrow destination", dst_id),
+        })?;
+
+        let (sx, sy) = src_rect.src_anchor(*src_side);
+        let (ex, ey) = dst_rect.dst_anchor(*dst_side);
+        let waypoints = compute_route(sx, sy, *src_side, ex, ey, *dst_side);
+
+        slots[*idx] = DrawSlot::Ready(DrawObject::Arrow(ResolvedArrow { waypoints }));
+    }
+    Ok(())
 }
 
 fn compute_canvas_size(
@@ -317,17 +391,18 @@ DSL SYNTAX:
     collision on|off
 
   OBJECTS:
-    rect <col> <row> <w> <h> [s=<style>] [overflow=<mode>] [align=<align>] [c=<content>]
+    rect <col> <row> <w> <h> [id=<name>] [s=<style>] [overflow=<mode>] [align=<align>] [c=<content>]
     text <col> <row> c=<content>
     hline <col> <row> <length> [s=<style>]
     vline <col> <row> <length> [s=<style>]
-    arrow <from_col> <from_row> <to_col> <to_row>
+    arrow <src_id>.<side> <dst_id>.<side>
 
   SHORTHAND:
     s=  → style=       c=  → content=
     Style values: l=light h=heavy d=double r=rounded
     Overflow values: ellipsis|overflow|hidden|error
     Align values: l=left c=center r=right
+    Side values: t=top r=right b=bottom l=left
 
 BORDER STYLES:
   light/l (default):  ┌─┐ │ └─┘
@@ -353,39 +428,78 @@ CONTENT ALIGNMENT:
   right/r:            Right-aligned (left side truncated/overflows)
 
 ARROWS:
-  Horizontal: ──→  ←──
-  Vertical:   │↓   ↑│
-  L-shaped:   ──┐  (horizontal first, then vertical)
-                ↓
+  Arrows connect objects by id and side (anchor point).
+  Routing is automatic based on source/destination sides.
+
+  Syntax: arrow <src_id>.<side> <dst_id>.<side>
+
+  Route types (auto-selected):
+    Straight:     ──→        (opposite sides, aligned)
+    L-shaped:     ──┐        (perpendicular sides, favorable)
+                    ↓
+    Z-shaped:     ──┐        (same direction, not aligned)
+                    └──→
+    U-shaped:     ──┐        (opposite sides, same axis — ㄷ shape)
+                    │
+                  ←─┘
+
+  Source anchor: 1 cell outside border (arrow starts here)
+  Dest anchor:   on border (arrowhead replaces border character)
 
 EXAMPLE:
   input:
-    echo "canvas 30 7
+    echo "canvas 52 27 border=r
     collision off
-    rect 0 0 10 3 s=r c=Server
-    rect 16 0 10 3 c=Client
-    arrow 12 2 16 2
-    text 0 6 c=System Architecture" | unid
+    # Boxes: 4 styles + alignment + id
+    rect 2 1 16 1 id=api s=d align=c c=API Gateway
+    rect 28 1 12 1 id=web align=c c=Web Client
+    rect 2 9 16 1 id=auth s=r c=Auth 인증
+    rect 28 9 12 1 id=db s=h align=r c=Data Store
+    # Anchor-based arrows (auto-routed)
+    arrow api.r web.l
+    arrow api.b auth.t
+    text 12 5 c=req
+    arrow web.b db.t
+    text 36 5 c=query
+    arrow auth.r db.l
+    text 21 10 c=sync
+    # Separator + overflow demos
+    hline 2 17 48 s=dash
+    text 2 19 c=ellipsis:
+    rect 12 19 10 1 c=LongServiceName
+    text 26 19 c=overflow:
+    rect 36 19 10 1 overflow=overflow c=LongServiceName
+    text 2 22 c=hidden:
+    rect 12 22 10 1 overflow=hidden c=LongServiceName" | unid
 
   output:
-    ╭──────────╮    ┌──────────┐
-    │          │    │          │
-    │Server    │────→Client    │
-    │          │    │          │
-    ╰──────────╯    └──────────┘
-
-    System Architecture
-
-CJK EXAMPLE:
-  input:
-    echo "canvas 20 3
-    collision off
-    rect 0 0 12 1 c=한글 테스트" | unid
-
-  output:
-    ┌────────────┐
-    │한글 테스트 │
-    └────────────┘
+    ╭──────────────────────────────────────────────────╮
+    │ ╔════════════════╗        ┌────────────┐         │
+    │ ║  API Gateway   ║────────→ Web Client │         │
+    │ ╚════════════════╝        └────────────┘         │
+    │          │                       │               │
+    │          │req                    │query          │
+    │          │                       │               │
+    │          │                       │               │
+    │          │                       │               │
+    │ ╭────────↓───────╮        ┏━━━━━━↓━━━━━┓         │
+    │ │Auth 인증       │─sync───→  Data Store┃         │
+    │ ╰────────────────╯        ┗━━━━━━━━━━━━┛         │
+    │                                                  │
+    │                                                  │
+    │                                                  │
+    │                                                  │
+    │                                                  │
+    │ ╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌ │
+    │                                                  │
+    │ ellipsis: ┌──────────┐  overflow: ┌──────────┐   │
+    │           │LongSer..8│            │LongServiceName
+    │           └──────────┘            └──────────┘   │
+    │ hidden:   ┌──────────┐                           │
+    │           │LongServic│                           │
+    │           └──────────┘                           │
+    │                                                  │
+    ╰──────────────────────────────────────────────────╯
 
 NOTES:
   - --collision CLI flag overrides DSL collision declaration
@@ -394,6 +508,8 @@ NOTES:
   - content= (c=) must be the last option on a line
   - Use \n in content for literal newlines
   - Canvas border is included in the specified size (e.g., 20x5 with border → 18x3 inner)
+  - id= names: alphanumeric, underscore, hyphen only
+  - Arrow routing is fully automatic based on anchor sides
 "#
     );
 }

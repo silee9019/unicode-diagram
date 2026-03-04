@@ -27,6 +27,15 @@ pub enum ContentAlign {
     Right,
 }
 
+/// Side of a rect for anchor-based arrows.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Side {
+    Top,
+    Right,
+    Bottom,
+    Left,
+}
+
 /// A rectangle with optional content.
 #[derive(Debug, Clone)]
 pub struct Rect {
@@ -36,6 +45,7 @@ pub struct Rect {
     pub width: usize,
     /// Inner height (excluding borders).
     pub height: usize,
+    pub id: Option<String>,
     pub content: Option<String>,
     pub style: BorderStyle,
     pub content_overflow: ContentOverflow,
@@ -49,6 +59,7 @@ impl Rect {
             row,
             width,
             height,
+            id: None,
             content: None,
             style: BorderStyle::default(),
             content_overflow: ContentOverflow::default(),
@@ -64,5 +75,35 @@ impl Rect {
     /// Total height including borders.
     pub fn outer_height(&self) -> usize {
         self.height + 2
+    }
+
+    /// Center column (display-column of the inner center).
+    fn center_col(&self) -> usize {
+        self.col + 1 + self.width / 2
+    }
+
+    /// Center row (row of the inner center).
+    fn center_row(&self) -> usize {
+        self.row + 1 + self.height / 2
+    }
+
+    /// Source anchor: 1 cell OUTSIDE the border (arrow starts here).
+    pub fn src_anchor(&self, side: Side) -> (usize, usize) {
+        match side {
+            Side::Top => (self.center_col(), self.row.saturating_sub(1)),
+            Side::Right => (self.col + self.width + 2, self.center_row()),
+            Side::Bottom => (self.center_col(), self.row + self.height + 2),
+            Side::Left => (self.col.saturating_sub(1), self.center_row()),
+        }
+    }
+
+    /// Dest anchor: ON the border (arrowhead replaces border character).
+    pub fn dst_anchor(&self, side: Side) -> (usize, usize) {
+        match side {
+            Side::Top => (self.center_col(), self.row),
+            Side::Right => (self.col + self.width + 1, self.center_row()),
+            Side::Bottom => (self.center_col(), self.row + self.height + 1),
+            Side::Left => (self.col, self.center_row()),
+        }
     }
 }

@@ -1,7 +1,8 @@
 use crate::canvas::Canvas;
 use crate::error::UnidError;
+use crate::object::arrow::{corner_char, segment_dir, ResolvedArrow};
 use crate::object::{
-    Arrow, BorderStyle, ContentAlign, ContentOverflow, DrawObject, HLine, LineStyle, Rect, Text,
+    BorderStyle, ContentAlign, ContentOverflow, DrawObject, HLine, LineStyle, Rect, Text,
     VLine,
 };
 use crate::width;
@@ -293,48 +294,67 @@ impl Renderer {
         Ok(())
     }
 
-    fn draw_arrow(&mut self, arrow: &Arrow, idx: usize) -> Result<(), UnidError> {
-        let (fc, fr, tc, tr) = (arrow.from_col, arrow.from_row, arrow.to_col, arrow.to_row);
-
-        if fr == tr {
-            let (min, max) = if fc < tc { (fc, tc) } else { (tc, fc) };
-            let tip = if tc > fc { '→' } else { '←' };
-            for c in min..=max {
-                self.canvas
-                    .put_char(c, fr, '─', self.collision, idx)?;
-            }
-            self.canvas.put_char(tc, fr, tip, self.collision, idx)?;
-        } else if fc == tc {
-            let (min, max) = if fr < tr { (fr, tr) } else { (tr, fr) };
-            let tip = if tr > fr { '↓' } else { '↑' };
-            for r in min..=max {
-                self.canvas
-                    .put_char(fc, r, '│', self.collision, idx)?;
-            }
-            self.canvas.put_char(fc, tr, tip, self.collision, idx)?;
-        } else {
-            let v_tip = if tr > fr { '↓' } else { '↑' };
-            let (h_start, h_end) = if tc > fc { (fc, tc) } else { (tc, fc) };
-            for c in h_start..=h_end {
-                self.canvas
-                    .put_char(c, fr, '─', self.collision, idx)?;
-            }
-            let corner = match (tc > fc, tr > fr) {
-                (true, true) => '┐',
-                (true, false) => '┘',
-                (false, true) => '┌',
-                (false, false) => '└',
-            };
-            self.canvas.put_char(tc, fr, corner, self.collision, idx)?;
-            let (v_start, v_end) = if tr > fr { (fr + 1, tr) } else { (tr, fr - 1) };
-            for r in v_start..v_end {
-                self.canvas
-                    .put_char(tc, r, '│', self.collision, idx)?;
-            }
-            self.canvas
-                .put_char(tc, v_end, v_tip, self.collision, idx)?;
+    fn draw_arrow(&mut self, arrow: &ResolvedArrow, idx: usize) -> Result<(), UnidError> {
+        let wp = &arrow.waypoints;
+        if wp.len() < 2 {
+            return Ok(());
         }
 
+        // Draw each segment between consecutive waypoints
+        for i in 0..wp.len() - 1 {
+            let (fc, fr) = wp[i];
+            let (tc, tr) = wp[i + 1];
+            let is_last = i == wp.len() - 2;
+
+            self.draw_straight_segment(fc, fr, tc, tr, is_last, idx)?;
+        }
+
+        // Draw corner characters at intermediate waypoints
+        for i in 1..wp.len() - 1 {
+            let (pc, pr) = wp[i - 1];
+            let (cc, cr) = wp[i];
+            let (nc, nr) = wp[i + 1];
+            let incoming = segment_dir(pc, pr, cc, cr);
+            let outgoing = segment_dir(cc, cr, nc, nr);
+            let corner = corner_char(incoming, outgoing);
+            self.canvas.put_char(cc, cr, corner, false, idx)?;
+        }
+
+        Ok(())
+    }
+
+    /// Draws a straight line segment (horizontal or vertical).
+    /// If `with_tip`, the endpoint gets an arrowhead.
+    fn draw_straight_segment(
+        &mut self,
+        fc: usize,
+        fr: usize,
+        tc: usize,
+        tr: usize,
+        with_tip: bool,
+        idx: usize,
+    ) -> Result<(), UnidError> {
+        if fr == tr {
+            // Horizontal
+            let (min, max) = if fc < tc { (fc, tc) } else { (tc, fc) };
+            for c in min..=max {
+                self.canvas.put_char(c, fr, '─', self.collision, idx)?;
+            }
+            if with_tip {
+                let tip = if tc > fc { '→' } else { '←' };
+                self.canvas.put_char(tc, fr, tip, self.collision, idx)?;
+            }
+        } else if fc == tc {
+            // Vertical
+            let (min, max) = if fr < tr { (fr, tr) } else { (tr, fr) };
+            for r in min..=max {
+                self.canvas.put_char(fc, r, '│', self.collision, idx)?;
+            }
+            if with_tip {
+                let tip = if tr > fr { '↓' } else { '↑' };
+                self.canvas.put_char(fc, tr, tip, self.collision, idx)?;
+            }
+        }
         Ok(())
     }
 }
@@ -620,28 +640,28 @@ mod tests {
 
     #[test]
     fn render_horizontal_arrow_right() {
-        let arrow = Arrow::new(0, 0, 4, 0);
+        let arrow = ResolvedArrow { waypoints: vec![(0, 0), (4, 0)] };
         let result = render_objects(5, 1, &[DrawObject::Arrow(arrow)], false);
         assert_eq!(result, "────→");
     }
 
     #[test]
     fn render_horizontal_arrow_left() {
-        let arrow = Arrow::new(4, 0, 0, 0);
+        let arrow = ResolvedArrow { waypoints: vec![(4, 0), (0, 0)] };
         let result = render_objects(5, 1, &[DrawObject::Arrow(arrow)], false);
         assert_eq!(result, "←────");
     }
 
     #[test]
     fn render_vertical_arrow_down() {
-        let arrow = Arrow::new(0, 0, 0, 2);
+        let arrow = ResolvedArrow { waypoints: vec![(0, 0), (0, 2)] };
         let result = render_objects(1, 3, &[DrawObject::Arrow(arrow)], false);
         assert_eq!(result, "│\n│\n↓");
     }
 
     #[test]
     fn render_vertical_arrow_up() {
-        let arrow = Arrow::new(0, 2, 0, 0);
+        let arrow = ResolvedArrow { waypoints: vec![(0, 2), (0, 0)] };
         let result = render_objects(1, 3, &[DrawObject::Arrow(arrow)], false);
         assert_eq!(result, "↑\n│\n│");
     }
@@ -747,6 +767,35 @@ mod tests {
         let result = render_objects(7, 3, &[DrawObject::Rect(rect)], false);
         assert!(result.contains("Hello"));
         assert!(!result.contains("World"));
+    }
+
+    #[test]
+    fn render_l_shaped_arrow() {
+        // L-shape: right then down via bend at (3,0)
+        let arrow = ResolvedArrow { waypoints: vec![(0, 0), (3, 0), (3, 2)] };
+        let result = render_objects(4, 3, &[DrawObject::Arrow(arrow)], false);
+        assert_eq!(result, "───┐\n   │\n   ↓");
+    }
+
+    #[test]
+    fn render_z_shaped_arrow() {
+        // Z-shape: down, then right, then down
+        let arrow = ResolvedArrow { waypoints: vec![(0, 0), (0, 2), (4, 2), (4, 4)] };
+        let result = render_objects(5, 5, &[DrawObject::Arrow(arrow)], false);
+        assert!(result.contains('│'));
+        assert!(result.contains('└'));
+        assert!(result.contains('┐'));
+        assert!(result.contains('↓'));
+    }
+
+    #[test]
+    fn render_u_shaped_arrow() {
+        // U-shape: down, right, then up
+        let arrow = ResolvedArrow { waypoints: vec![(0, 0), (0, 3), (4, 3), (4, 0)] };
+        let result = render_objects(5, 4, &[DrawObject::Arrow(arrow)], false);
+        assert!(result.contains('└'));
+        assert!(result.contains('┘'));
+        assert!(result.contains('↑'));
     }
 
     #[test]

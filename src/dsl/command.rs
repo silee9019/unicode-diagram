@@ -1,4 +1,4 @@
-use crate::object::rect::{BorderStyle, ContentAlign, ContentOverflow};
+use crate::object::rect::{BorderStyle, ContentAlign, ContentOverflow, Side};
 use crate::object::DrawObject;
 
 /// Represents a parsed DSL command.
@@ -14,8 +14,16 @@ pub enum DslCommand {
     },
     /// Collision mode declaration.
     Collision(bool),
-    /// A drawable object.
+    /// A drawable object (rect, text, hline, vline — NOT arrow).
     Object(DrawObject),
+    /// An unresolved arrow referencing object IDs (resolved later).
+    Arrow {
+        src_id: String,
+        src_side: Side,
+        dst_id: String,
+        dst_side: Side,
+        line: usize,
+    },
 }
 
 /// Canvas dimension: explicit size or auto.

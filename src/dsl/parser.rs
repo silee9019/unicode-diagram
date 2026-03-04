@@ -1,7 +1,8 @@
 use crate::dsl::command::{CanvasSize, DslCommand};
 use crate::error::UnidError;
+use crate::object::rect::Side;
 use crate::object::{
-    Arrow, BorderStyle, ContentAlign, ContentOverflow, DrawObject, HLine, LineStyle, Rect, Text,
+    BorderStyle, ContentAlign, ContentOverflow, DrawObject, HLine, LineStyle, Rect, Text,
     VLine,
 };
 
@@ -196,7 +197,10 @@ fn parse_rect(tokens: &[String], line: usize) -> Result<DslCommand, UnidError> {
     let content_idx = content_token_index(tokens, 5);
 
     for token in &tokens[5..content_idx] {
-        if let Some(v) = strip_option(token, "style").or_else(|| strip_option(token, "s")) {
+        if let Some(v) = strip_option(token, "id") {
+            validate_id(v, line)?;
+            rect.id = Some(v.to_string());
+        } else if let Some(v) = strip_option(token, "style").or_else(|| strip_option(token, "s")) {
             rect.style = parse_border_style(v, line)?;
         } else if let Some(v) = strip_option(token, "overflow")
         {
@@ -296,21 +300,78 @@ fn parse_vline(tokens: &[String], line: usize) -> Result<DslCommand, UnidError> 
 }
 
 fn parse_arrow(tokens: &[String], line: usize) -> Result<DslCommand, UnidError> {
-    if tokens.len() < 5 {
+    if tokens.len() < 3 {
         return Err(UnidError::Parse {
             line,
-            message: "arrow requires from_col, from_row, to_col, to_row".to_string(),
+            message: "arrow requires <src_id>.<side> <dst_id>.<side> (e.g., 'arrow api.right db.top')".to_string(),
         });
     }
 
-    let from_col = parse_usize(&tokens[1], "from_col", line)?;
-    let from_row = parse_usize(&tokens[2], "from_row", line)?;
-    let to_col = parse_usize(&tokens[3], "to_col", line)?;
-    let to_row = parse_usize(&tokens[4], "to_row", line)?;
+    let (src_id, src_side) = parse_anchor(&tokens[1], line)?;
+    let (dst_id, dst_side) = parse_anchor(&tokens[2], line)?;
 
-    Ok(DslCommand::Object(DrawObject::Arrow(Arrow::new(
-        from_col, from_row, to_col, to_row,
-    ))))
+    Ok(DslCommand::Arrow {
+        src_id,
+        src_side,
+        dst_id,
+        dst_side,
+        line,
+    })
+}
+
+/// Parses an anchor reference like "api.right" into ("api", Side::Right).
+fn parse_anchor(s: &str, line: usize) -> Result<(String, Side), UnidError> {
+    let (id, side_str) = s.rsplit_once('.').ok_or_else(|| UnidError::Parse {
+        line,
+        message: format!("invalid anchor '{}' (expected <id>.<side>, e.g., 'api.right')", s),
+    })?;
+
+    if id.is_empty() {
+        return Err(UnidError::Parse {
+            line,
+            message: format!("anchor '{}' has empty id", s),
+        });
+    }
+
+    validate_id(id, line)?;
+
+    let side = match side_str.to_lowercase().as_str() {
+        "top" | "t" => Side::Top,
+        "right" | "r" => Side::Right,
+        "bottom" | "b" => Side::Bottom,
+        "left" | "l" => Side::Left,
+        _ => {
+            return Err(UnidError::Parse {
+                line,
+                message: format!(
+                    "unknown side '{}' in anchor '{}' (expected top/t, right/r, bottom/b, left/l)",
+                    side_str, s
+                ),
+            });
+        }
+    };
+
+    Ok((id.to_string(), side))
+}
+
+/// Validates that an ID contains only alphanumeric, underscore, or hyphen characters.
+fn validate_id(id: &str, line: usize) -> Result<(), UnidError> {
+    if id.is_empty() {
+        return Err(UnidError::Parse {
+            line,
+            message: "id cannot be empty".to_string(),
+        });
+    }
+    if !id.chars().all(|c| c.is_alphanumeric() || c == '_' || c == '-') {
+        return Err(UnidError::Parse {
+            line,
+            message: format!(
+                "invalid id '{}' (only alphanumeric, '_', '-' allowed)",
+                id
+            ),
+        });
+    }
+    Ok(())
 }
 
 /// Strips a key= prefix from a token. Supports both full name and abbreviation.
@@ -570,14 +631,65 @@ mod tests {
     }
 
     #[test]
-    fn parse_arrow() {
-        let cmds = parse("arrow 0 0 10 5").unwrap();
+    fn parse_arrow_anchor() {
+        let cmds = parse("arrow api.right db.top").unwrap();
         match &cmds[0] {
-            DslCommand::Object(DrawObject::Arrow(a)) => {
-                assert_eq!((a.from_col, a.from_row, a.to_col, a.to_row), (0, 0, 10, 5));
+            DslCommand::Arrow { src_id, src_side, dst_id, dst_side, .. } => {
+                assert_eq!(src_id, "api");
+                assert_eq!(*src_side, Side::Right);
+                assert_eq!(dst_id, "db");
+                assert_eq!(*dst_side, Side::Top);
             }
             _ => panic!("expected Arrow"),
         }
+    }
+
+    #[test]
+    fn parse_arrow_shorthand_sides() {
+        let cmds = parse("arrow a.r b.l").unwrap();
+        match &cmds[0] {
+            DslCommand::Arrow { src_side, dst_side, .. } => {
+                assert_eq!(*src_side, Side::Right);
+                assert_eq!(*dst_side, Side::Left);
+            }
+            _ => panic!("expected Arrow"),
+        }
+    }
+
+    #[test]
+    fn parse_arrow_invalid_anchor() {
+        let result = parse("arrow api db.top");
+        assert!(result.is_err());
+        let err = result.unwrap_err().to_string();
+        assert!(err.contains("invalid anchor"));
+    }
+
+    #[test]
+    fn parse_arrow_invalid_side() {
+        let result = parse("arrow api.up db.top");
+        assert!(result.is_err());
+        let err = result.unwrap_err().to_string();
+        assert!(err.contains("unknown side"));
+    }
+
+    #[test]
+    fn parse_rect_with_id() {
+        let cmds = parse("rect 0 0 10 3 id=api c=API").unwrap();
+        match &cmds[0] {
+            DslCommand::Object(DrawObject::Rect(r)) => {
+                assert_eq!(r.id.as_deref(), Some("api"));
+                assert_eq!(r.content.as_deref(), Some("API"));
+            }
+            _ => panic!("expected Rect"),
+        }
+    }
+
+    #[test]
+    fn parse_rect_invalid_id() {
+        let result = parse("rect 0 0 10 3 id=a@b");
+        assert!(result.is_err());
+        let err = result.unwrap_err().to_string();
+        assert!(err.contains("invalid id"));
     }
 
     #[test]

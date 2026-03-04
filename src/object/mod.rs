@@ -3,9 +3,9 @@ pub mod line;
 pub mod rect;
 pub mod text;
 
-pub use arrow::Arrow;
+pub use arrow::{Arrow, Dir, ResolvedArrow};
 pub use line::{HLine, LineStyle, VLine};
-pub use rect::{BorderStyle, ContentAlign, ContentOverflow, Rect};
+pub use rect::{BorderStyle, ContentAlign, ContentOverflow, Rect, Side};
 pub use text::Text;
 
 use crate::width;
@@ -17,7 +17,7 @@ pub enum DrawObject {
     Text(Text),
     HLine(HLine),
     VLine(VLine),
-    Arrow(Arrow),
+    Arrow(ResolvedArrow),
 }
 
 impl DrawObject {
@@ -29,9 +29,12 @@ impl DrawObject {
             DrawObject::HLine(h) => (h.col + h.length, h.row + 1),
             DrawObject::VLine(v) => (v.col + 1, v.row + v.length),
             DrawObject::Arrow(a) => {
-                let max_col = a.from_col.max(a.to_col) + 1;
-                let max_row = a.from_row.max(a.to_row) + 1;
-                (max_col, max_row)
+                let (mut max_col, mut max_row) = (0, 0);
+                for &(c, r) in &a.waypoints {
+                    max_col = max_col.max(c);
+                    max_row = max_row.max(r);
+                }
+                (max_col + 1, max_row + 1)
             }
         }
     }
@@ -43,7 +46,14 @@ impl DrawObject {
             DrawObject::Text(t) => (t.col, t.row),
             DrawObject::HLine(h) => (h.col, h.row),
             DrawObject::VLine(v) => (v.col, v.row),
-            DrawObject::Arrow(a) => (a.from_col.min(a.to_col), a.from_row.min(a.to_row)),
+            DrawObject::Arrow(a) => {
+                let (mut min_col, mut min_row) = (usize::MAX, usize::MAX);
+                for &(c, r) in &a.waypoints {
+                    min_col = min_col.min(c);
+                    min_row = min_row.min(r);
+                }
+                (min_col, min_row)
+            }
         }
     }
 
@@ -70,7 +80,8 @@ impl DrawObject {
             DrawObject::HLine(h) => format!("hline at ({},{}) len={}", h.col, h.row, h.length),
             DrawObject::VLine(v) => format!("vline at ({},{}) len={}", v.col, v.row, v.length),
             DrawObject::Arrow(a) => {
-                format!("arrow ({},{})->({},{})", a.from_col, a.from_row, a.to_col, a.to_row)
+                let pts: Vec<String> = a.waypoints.iter().map(|(c, r)| format!("({c},{r})")).collect();
+                format!("arrow {}", pts.join("->"))
             }
         }
     }
@@ -101,10 +112,10 @@ impl DrawObject {
             DrawObject::VLine(v) => {
                 format!("vline ({},{}) len={} {:?}", v.col, v.row, v.length, v.style)
             }
-            DrawObject::Arrow(a) => format!(
-                "arrow ({},{}) -> ({},{})",
-                a.from_col, a.from_row, a.to_col, a.to_row
-            ),
+            DrawObject::Arrow(a) => {
+                let pts: Vec<String> = a.waypoints.iter().map(|(c, r)| format!("({c},{r})")).collect();
+                format!("arrow {}", pts.join(" -> "))
+            }
         }
     }
 }

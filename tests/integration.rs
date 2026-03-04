@@ -140,16 +140,60 @@ fn render_multiple_styles() {
 }
 
 #[test]
-fn render_arrows() {
+fn render_anchor_arrow_horizontal() {
     let (stdout, _, ok) = run_stdin(
-        "canvas 10 5\n\
+        "canvas 30 5\n\
          collision off\n\
-         arrow 0 0 9 0\n\
-         arrow 0 2 0 4",
+         rect 0 0 6 1 id=a c=A\n\
+         rect 18 0 6 1 id=b c=B\n\
+         arrow a.r b.l",
     );
     assert!(ok);
     assert!(stdout.contains('→'));
+    assert!(stdout.contains('─'));
+}
+
+#[test]
+fn render_anchor_arrow_vertical() {
+    let (stdout, _, ok) = run_stdin(
+        "canvas 10 10\n\
+         collision off\n\
+         rect 0 0 6 1 id=a c=A\n\
+         rect 0 6 6 1 id=b c=B\n\
+         arrow a.b b.t",
+    );
+    assert!(ok);
     assert!(stdout.contains('↓'));
+    assert!(stdout.contains('│'));
+}
+
+#[test]
+fn render_anchor_arrow_l_shape() {
+    let (stdout, _, ok) = run_stdin(
+        "canvas 30 10\n\
+         collision off\n\
+         rect 0 0 6 1 id=a c=A\n\
+         rect 18 6 6 1 id=b c=B\n\
+         arrow a.r b.t",
+    );
+    assert!(ok);
+    assert!(stdout.contains('→') || stdout.contains('↓'));
+    assert!(stdout.contains('─') || stdout.contains('│'));
+}
+
+#[test]
+fn render_anchor_arrow_u_shape() {
+    // Same side (right→right) → ㄷ-shape
+    let (stdout, _, ok) = run_stdin(
+        "canvas 20 10\n\
+         collision off\n\
+         rect 0 0 6 1 id=a c=A\n\
+         rect 0 6 6 1 id=b c=B\n\
+         arrow a.r b.r",
+    );
+    assert!(ok);
+    // ㄷ-shape should have corners
+    assert!(stdout.contains('┐') || stdout.contains('┘'));
 }
 
 #[test]
@@ -168,11 +212,11 @@ fn render_lines() {
 #[test]
 fn render_cjk_mixed_diagram() {
     let (stdout, _, ok) = run_stdin(
-        "canvas 30 5\n\
+        "canvas 30 10\n\
          collision off\n\
-         rect 0 0 12 1 c=서버\n\
-         rect 18 0 8 1 c=DB\n\
-         arrow 14 1 18 1",
+         rect 0 0 12 1 id=srv c=서버\n\
+         rect 18 0 8 1 id=db c=DB\n\
+         arrow srv.r db.l",
     );
     assert!(ok);
     assert!(stdout.contains("서버"));
@@ -412,6 +456,29 @@ fn error_parse_error() {
     assert!(stderr.contains("unknown command"));
 }
 
+#[test]
+fn error_unknown_arrow_id() {
+    let (_, stderr, ok) = run_stdin(
+        "canvas 20 5\n\
+         collision off\n\
+         rect 0 0 4 1 id=a\n\
+         arrow a.r nonexistent.l",
+    );
+    assert!(!ok);
+    assert!(stderr.contains("unknown object id"));
+}
+
+#[test]
+fn error_invalid_arrow_anchor() {
+    let (_, stderr, ok) = run_stdin(
+        "canvas 20 5\n\
+         collision off\n\
+         arrow noid db.top",
+    );
+    assert!(!ok);
+    assert!(stderr.contains("invalid anchor"));
+}
+
 // ─── Comments and blank lines ───────────────────────────────────────
 
 #[test]
@@ -465,4 +532,29 @@ fn content_with_newline_escape() {
          rect 0 0 10 3 c=Line1\\nLine2",
     );
     assert!(ok);
+}
+
+// ─── Rect ID ────────────────────────────────────────────────────────
+
+#[test]
+fn rect_with_id() {
+    let (stdout, _, ok) = run_stdin(
+        "canvas 30 5\n\
+         collision off\n\
+         rect 0 0 8 1 id=mybox c=Hello",
+    );
+    assert!(ok);
+    assert!(stdout.contains("Hello"));
+}
+
+#[test]
+fn duplicate_id_error() {
+    let (_, stderr, ok) = run_stdin(
+        "canvas 20 5\n\
+         collision off\n\
+         rect 0 0 4 1 id=a\n\
+         rect 10 0 4 1 id=a",
+    );
+    assert!(!ok);
+    assert!(stderr.contains("duplicate"));
 }
