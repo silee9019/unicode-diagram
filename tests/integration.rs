@@ -816,6 +816,20 @@ fn arrow_legend_with_pos() {
 }
 
 #[test]
+fn text_overwrites_structure() {
+    // Text rendered in pass 2 should overwrite border from pass 1
+    let (stdout, _, ok) = run_stdin(
+        "canvas 10 3\n\
+         collision off\n\
+         rect 0 0 8 1\n\
+         text 0 0 c=X",
+    );
+    assert!(ok);
+    // 'X' should overwrite the top-left corner '┌'
+    assert!(stdout.starts_with('X'));
+}
+
+#[test]
 fn arrow_legend_vertical() {
     let (stdout, _, ok) = run_stdin(
         "canvas 20 12\n\

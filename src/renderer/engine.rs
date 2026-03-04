@@ -30,7 +30,7 @@ impl Renderer {
         }
     }
 
-    /// Draws a single object onto the canvas.
+    /// Draws a single object onto the canvas (single-pass, used for lint/collision).
     pub fn draw(&mut self, object: &DrawObject) -> Result<(), UnidError> {
         let idx = self.objects.len();
         self.objects.push(object.clone());
@@ -45,11 +45,39 @@ impl Renderer {
         result.map_err(|e| self.enrich_error(e, object, idx))
     }
 
-    /// Draws all objects in order.
+    /// Draws all objects with 2-pass rendering:
+    /// Pass 1: Structure (borders, lines, arrow lines/corners)
+    /// Pass 2: Text content (c=, lg=, text objects) — overwrites structure
     pub fn draw_all(&mut self, objects: &[DrawObject]) -> Result<(), UnidError> {
+        // Register all objects first for collision tracking
         for obj in objects {
-            self.draw(obj)?;
+            self.objects.push(obj.clone());
         }
+
+        // Pass 1: Draw structural elements
+        for (idx, obj) in objects.iter().enumerate() {
+            let result = match obj {
+                DrawObject::Rect(r) => self.draw_rect_structure(r, idx),
+                DrawObject::HLine(h) => self.draw_hline_structure(h, idx),
+                DrawObject::VLine(v) => self.draw_vline_structure(v, idx),
+                DrawObject::Arrow(a) => self.draw_arrow_structure(a, idx),
+                DrawObject::Text(_) => Ok(()), // Text is content-only
+            };
+            result.map_err(|e| self.enrich_error(e, obj, idx))?;
+        }
+
+        // Pass 2: Draw text content (overwrites structure, no collision check)
+        for (idx, obj) in objects.iter().enumerate() {
+            let result = match obj {
+                DrawObject::Rect(r) => self.draw_rect_content(r, idx),
+                DrawObject::Text(t) => self.draw_text(t, idx),
+                DrawObject::HLine(h) => self.draw_hline_content(h, idx),
+                DrawObject::VLine(v) => self.draw_vline_content(v, idx),
+                DrawObject::Arrow(a) => self.draw_arrow_content(a, idx),
+            };
+            result.map_err(|e| self.enrich_error(e, obj, idx))?;
+        }
+
         Ok(())
     }
 
@@ -161,6 +189,12 @@ impl Renderer {
     }
 
     fn draw_rect(&mut self, rect: &Rect, idx: usize) -> Result<(), UnidError> {
+        self.draw_rect_structure(rect, idx)?;
+        self.draw_rect_content(rect, idx)
+    }
+
+    /// Draws rect structural elements (borders only).
+    fn draw_rect_structure(&mut self, rect: &Rect, idx: usize) -> Result<(), UnidError> {
         let (tl, tr, bl, br, h, v) = border_chars(rect.style);
         let col = rect.col;
         let row = rect.row;
@@ -194,14 +228,22 @@ impl Renderer {
         self.canvas
             .put_char(col + inner_w + 1, row + inner_h + 1, br, self.collision, idx)?;
 
-        // Content (multiline support)
+        Ok(())
+    }
+
+    /// Draws rect text content and legend (Pass 2).
+    fn draw_rect_content(&mut self, rect: &Rect, idx: usize) -> Result<(), UnidError> {
+        let col = rect.col;
+        let row = rect.row;
+        let inner_w = rect.width;
+        let inner_h = rect.height;
+
         if let Some(content) = &rect.content {
             let lines: Vec<&str> = content.lines().collect();
             let line_count = lines.len();
             let overflow = rect.content_overflow;
             let align = rect.content_align;
 
-            // Vertical centering: place the text block in the middle of inner area
             let start_row = if line_count <= inner_h {
                 row + 1 + (inner_h - line_count) / 2
             } else {
@@ -211,18 +253,17 @@ impl Renderer {
             for (i, line) in lines.iter().enumerate() {
                 let r = start_row + i;
                 if r > row + inner_h {
-                    break; // Exceeds inner area
+                    break;
                 }
                 self.render_content_line(col, r, line, inner_w, overflow, align, idx)?;
             }
         }
 
-        // Legend
         if let Some(legend) = &rect.legend {
             let effective_pos = match legend.pos {
                 LegendPos::Auto | LegendPos::Top => LegendPos::Top,
                 LegendPos::Bottom => LegendPos::Bottom,
-                _ => LegendPos::Top, // Rect only supports top/bottom
+                _ => LegendPos::Top,
             };
             let lg_col = col;
             let lg_row = match effective_pos {
@@ -312,12 +353,20 @@ impl Renderer {
     }
 
     fn draw_hline(&mut self, hline: &HLine, idx: usize) -> Result<(), UnidError> {
+        self.draw_hline_structure(hline, idx)?;
+        self.draw_hline_content(hline, idx)
+    }
+
+    fn draw_hline_structure(&mut self, hline: &HLine, idx: usize) -> Result<(), UnidError> {
         let ch = hline_char(hline.style);
         for c in 0..hline.length {
             self.canvas
                 .put_char(hline.col + c, hline.row, ch, self.collision, idx)?;
         }
+        Ok(())
+    }
 
+    fn draw_hline_content(&mut self, hline: &HLine, idx: usize) -> Result<(), UnidError> {
         if let Some(legend) = &hline.legend {
             let effective_pos = match legend.pos {
                 LegendPos::Auto | LegendPos::Top => LegendPos::Top,
@@ -335,17 +384,24 @@ impl Renderer {
             };
             self.draw_legend_text(lg_col, lg_row, legend, idx)?;
         }
-
         Ok(())
     }
 
     fn draw_vline(&mut self, vline: &VLine, idx: usize) -> Result<(), UnidError> {
+        self.draw_vline_structure(vline, idx)?;
+        self.draw_vline_content(vline, idx)
+    }
+
+    fn draw_vline_structure(&mut self, vline: &VLine, idx: usize) -> Result<(), UnidError> {
         let ch = vline_char(vline.style);
         for r in 0..vline.length {
             self.canvas
                 .put_char(vline.col, vline.row + r, ch, self.collision, idx)?;
         }
+        Ok(())
+    }
 
+    fn draw_vline_content(&mut self, vline: &VLine, idx: usize) -> Result<(), UnidError> {
         if let Some(legend) = &vline.legend {
             let effective_pos = match legend.pos {
                 LegendPos::Auto | LegendPos::Right => LegendPos::Right,
@@ -364,11 +420,16 @@ impl Renderer {
             };
             self.draw_legend_text(lg_col, lg_row, legend, idx)?;
         }
-
         Ok(())
     }
 
     fn draw_arrow(&mut self, arrow: &ResolvedArrow, idx: usize) -> Result<(), UnidError> {
+        self.draw_arrow_structure(arrow, idx)?;
+        self.draw_arrow_content(arrow, idx)
+    }
+
+    /// Draws arrow structural elements (lines, corners, arrowheads).
+    fn draw_arrow_structure(&mut self, arrow: &ResolvedArrow, idx: usize) -> Result<(), UnidError> {
         let wp = &arrow.waypoints;
         if wp.len() < 2 {
             return Ok(());
@@ -398,7 +459,7 @@ impl Renderer {
         if arrow.both && wp.len() >= 2 {
             let (sc, sr) = wp[0];
             let (nc, nr) = wp[1];
-            let dir = segment_dir(nc, nr, sc, sr); // Reverse direction
+            let dir = segment_dir(nc, nr, sc, sr);
             let tip = if let Some(h) = arrow.head {
                 h
             } else {
@@ -407,11 +468,14 @@ impl Renderer {
             self.canvas.put_char(sc, sr, tip, false, idx)?;
         }
 
-        // Legend: place text near the midpoint of the first segment
-        if let Some(legend) = &arrow.legend {
-            self.draw_arrow_legend(wp, legend, idx)?;
-        }
+        Ok(())
+    }
 
+    /// Draws arrow text content (legend).
+    fn draw_arrow_content(&mut self, arrow: &ResolvedArrow, idx: usize) -> Result<(), UnidError> {
+        if let Some(legend) = &arrow.legend {
+            self.draw_arrow_legend(&arrow.waypoints, legend, idx)?;
+        }
         Ok(())
     }
 
