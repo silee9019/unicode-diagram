@@ -4,7 +4,7 @@ use std::process;
 
 use clap::Parser;
 use unicode_diagram::canvas::Canvas;
-use unicode_diagram::cli::{Cli, CollisionMode, Commands};
+use unicode_diagram::cli::{Cli, Commands};
 use unicode_diagram::dsl::command::{CanvasSize, DslCommand};
 use unicode_diagram::dsl::parse;
 use unicode_diagram::error::UnidError;
@@ -30,7 +30,7 @@ fn main() {
                 Cli::parse_from(["unid", "--help"]);
                 Ok(())
             } else {
-                run_render(cli.collision)
+                run_render()
             }
         }
     };
@@ -76,10 +76,7 @@ struct CanvasConfig {
     objects: Vec<DrawObject>,
 }
 
-fn process_commands(
-    commands: Vec<DslCommand>,
-    collision_override: Option<CollisionMode>,
-) -> Result<CanvasConfig, UnidError> {
+fn process_commands(commands: Vec<DslCommand>) -> Result<CanvasConfig, UnidError> {
     let mut canvas_width = None;
     let mut canvas_height = None;
     let mut border = None;
@@ -149,13 +146,7 @@ fn process_commands(
 
     let cw = canvas_width.ok_or(UnidError::NoCanvas)?;
     let ch = canvas_height.ok_or(UnidError::NoCanvas)?;
-    let coll_dsl = collision.ok_or(UnidError::NoCollision)?;
-
-    let coll = match collision_override {
-        Some(CollisionMode::On) => true,
-        Some(CollisionMode::Off) => false,
-        None => coll_dsl,
-    };
+    let coll = collision.ok_or(UnidError::NoCollision)?;
 
     // Resolve arrows and fill PendingArrow slots
     resolve_arrows_into_slots(&mut slots, &arrow_slots, global_arrowhead)?;
@@ -315,10 +306,10 @@ fn compute_canvas_size(
     (w, h)
 }
 
-fn run_render(collision_override: Option<CollisionMode>) -> Result<(), UnidError> {
+fn run_render() -> Result<(), UnidError> {
     let input = read_stdin()?;
     let commands = parse(&input)?;
-    let config = process_commands(commands, collision_override)?;
+    let config = process_commands(commands)?;
     let (width, height) = compute_canvas_size(config.width, config.height, &config.objects, config.border);
 
     let canvas = Canvas::new(width, height);
@@ -357,7 +348,7 @@ fn run_render(collision_override: Option<CollisionMode>) -> Result<(), UnidError
 fn run_list() -> Result<(), UnidError> {
     let input = read_stdin()?;
     let commands = parse(&input)?;
-    let config = process_commands(commands, None)?;
+    let config = process_commands(commands)?;
     let (width, height) = compute_canvas_size(config.width, config.height, &config.objects, config.border);
 
     let auto_label = match (config.width, config.height) {
@@ -389,7 +380,7 @@ fn run_list() -> Result<(), UnidError> {
 fn run_lint() -> Result<(), UnidError> {
     let input = read_stdin()?;
     let commands = parse(&input)?;
-    let config = process_commands(commands, None)?;
+    let config = process_commands(commands)?;
     let (width, height) = compute_canvas_size(config.width, config.height, &config.objects, config.border);
 
     println!("Canvas: {}x{}", width, height);
@@ -460,11 +451,10 @@ fn print_guide() {
         r#"unid - Unicode Diagram Renderer
 
 USAGE:
-  echo "..." | unid                    Render from stdin (default)
-  echo "..." | unid --collision=off    Override collision mode
-  echo "..." | unid list               List objects in diagram
-  echo "..." | unid lint               Lint DSL for errors/warnings
-  unid guide                           Show this guide
+  echo "..." | unid          Render from stdin (default)
+  echo "..." | unid list    List objects in diagram
+  echo "..." | unid lint    Lint DSL for errors/warnings
+  unid guide                Show this guide
 
 DSL SYNTAX:
   Lines starting with # are comments. Blank lines are ignored.
@@ -475,7 +465,7 @@ DSL SYNTAX:
     canvas auto [border(b)=<style>]
       - auto: computes minimum size from all object bounds
       - border is included in the specified size (e.g., 20x5 with border → 18x3 inner)
-    collision on|off               (--collision CLI flag overrides this)
+    collision on|off
     arrowhead <char>               Global arrowhead family (optional)
 
   OBJECTS (canvas drawing targets):

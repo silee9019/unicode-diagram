@@ -50,30 +50,6 @@ fn run_subcmd(subcmd: &str, input: &str) -> (String, String, bool) {
     )
 }
 
-/// Pipe DSL input to unid with --collision flag.
-fn run_with_collision(input: &str, mode: &str) -> (String, String, bool) {
-    let flag = format!("--collision={mode}");
-    let mut child = unid()
-        .arg(&flag)
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()
-        .unwrap();
-    child
-        .stdin
-        .take()
-        .unwrap()
-        .write_all(input.as_bytes())
-        .unwrap();
-    let output = child.wait_with_output().unwrap();
-    (
-        String::from_utf8(output.stdout).unwrap(),
-        String::from_utf8(output.stderr).unwrap(),
-        output.status.success(),
-    )
-}
-
 // ─── Render (stdin default) ──────────────────────────────────────────
 
 #[test]
@@ -245,19 +221,6 @@ fn collision_off_allows_overlap() {
          collision off\n\
          box 0 0 5 1\n\
          box 3 0 5 1",
-    );
-    assert!(ok);
-}
-
-#[test]
-fn collision_cli_override() {
-    // DSL says collision on, but CLI overrides to off
-    let (_, _, ok) = run_with_collision(
-        "canvas 20 5\n\
-         collision on\n\
-         box 0 0 5 1\n\
-         box 3 0 5 1",
-        "off",
     );
     assert!(ok);
 }
