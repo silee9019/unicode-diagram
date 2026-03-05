@@ -133,7 +133,7 @@ func TestParseErrorInvalidID(t *testing.T) {
 }
 
 func TestParseContentNewline(t *testing.T) {
-	cmds, err := Parse(`text 0 0 c=line1\nline2`)
+	cmds, err := Parse(`text 0 0 c=line1<br>line2`)
 	require.NoError(t, err)
 	obj := cmds[0].(*ObjectCmd).Object.(*object.Text)
 	assert.Equal(t, "line1\nline2", obj.Content)

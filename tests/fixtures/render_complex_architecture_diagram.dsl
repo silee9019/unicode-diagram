@@ -1,7 +1,7 @@
 collision off
-box 4 2 31 3 id=bb s=r a=c c=Browser (Scenario B)\nConnect BO User
-box 56 2 36 3 id=ba s=r a=c c=Browser (Scenario A)\nConnect FO User
-box 114 2 38 3 id=bc s=r a=c c=Browser (Scenario C)\nConsole Admin
+box 4 2 31 3 id=bb s=r a=c c=Browser (Scenario B)<br>Connect BO User
+box 56 2 36 3 id=ba s=r a=c c=Browser (Scenario A)<br>Connect FO User
+box 114 2 38 3 id=bc s=r a=c c=Browser (Scenario C)<br>Console Admin
 text 22 7 c=B1. as-is: https://app-bo.example.com
 text 22 8 c=    to-be: https://app.example.com/backoffice
 text 22 10 c=A1. as-is: https://app-fo.example.com
@@ -15,9 +15,9 @@ box 4 22 31 1 id=boc s=r a=c c=BO Client (Port 3104)
 box 114 22 38 1 id=csc s=r a=c c=Console Client (MF Host, Port 5001)
 text 22 25 c=B2. as-is: GET https://api.example.com/connect/v1/back-office/users
 text 22 26 c=    to-be: GET https://app.example.com/api/backoffice/v1/users
-box 30 28 92 18 id=cs s=d lp=t lg=App Server (Port 8007) c=Endpoints:\n  FO:      /v1/users, /v1/orders, /v1/organizations\n  BO:      /v1/back-office/users, /v1/back-office/orders\n  Console: /api/v1/console/{users,orgs,roles}\n  MF:      /mf/**\n\nAuth:\n  @Order(1) /api/v*/console/**\n    -> ConsoleApiAuthFilter\n  @Order(2) /**\n    -> permitAll + RoleInterceptor
-box 70 40 48 3 id=ccc s=h a=c c=Console MF Client\n(MF Remote)\nServed as static /mf/**
-box 36 52 84 5 id=css s=d lp=t lg=Console Server (Port 8504) c=Auth:     /console/v1/sessions/verify -> session validation\nEmployee: /v1/employees/me (self only)\nEmployee: /v1/employees (CUD, admin menu)
+box 30 28 92 18 id=cs s=d lp=t lg=App Server (Port 8007) c=Endpoints:<br>  FO:      /v1/users, /v1/orders, /v1/organizations<br>  BO:      /v1/back-office/users, /v1/back-office/orders<br>  Console: /api/v1/console/{users,orgs,roles}<br>  MF:      /mf/**<br><br>Auth:<br>  @Order(1) /api/v*/console/**<br>    -> ConsoleApiAuthFilter<br>  @Order(2) /**<br>    -> permitAll + RoleInterceptor
+box 70 40 48 3 id=ccc s=h a=c c=Console MF Client<br>(MF Remote)<br>Served as static /mf/**
+box 36 52 84 5 id=css s=d lp=t lg=Console Server (Port 8504) c=Auth:     /console/v1/sessions/verify -> session validation<br>Employee: /v1/employees/me (self only)<br>Employee: /v1/employees (CUD, admin menu)
 arrow ba.b foc.t
 arrow foc.b cs.t
 arrow bb.b boc.t

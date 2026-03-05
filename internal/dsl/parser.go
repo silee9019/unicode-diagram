@@ -555,7 +555,7 @@ func extractContent(tokens []string, from, line int) (string, error) {
 				return "", &uerr.ParseError{Line: line, Message: "content= requires a value"}
 			}
 			content := strings.Join(parts, " ")
-			content = strings.ReplaceAll(content, `\n`, "\n")
+			content = strings.ReplaceAll(content, "<br>", "\n")
 			// Trim each line
 			lines := strings.Split(content, "\n")
 			for j := range lines {
@@ -593,7 +593,7 @@ func extractLegend(tokens []string, from, line int) (string, error) {
 				return "", &uerr.ParseError{Line: line, Message: "lg= requires a value"}
 			}
 			content := strings.Join(parts, " ")
-			content = strings.ReplaceAll(content, `\n`, "\n")
+			content = strings.ReplaceAll(content, "<br>", "\n")
 			lines := strings.Split(content, "\n")
 			for j := range lines {
 				lines[j] = strings.TrimSpace(lines[j])

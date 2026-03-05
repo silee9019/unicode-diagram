@@ -59,7 +59,7 @@ CONTENT & LEGEND:
   content(c)=         Text inside the object (box inner area, text object)
   legend(lg)=         Text outside/near the object (box, hline, vline, arrow)
   content(c)= and legend(lg)= must be the last options on a line.
-  Use \n for multiline text. Leading/trailing whitespace per line is trimmed.
+  Use <br> for multiline text. Leading/trailing whitespace per line is trimmed.
 
 OVERFLOW MODES (overflow(o)= / legend-overflow(lo)= / global "overflow"):
   ellipsis(el, default): Truncate with "prefix..{N}" where N=truncated display width
