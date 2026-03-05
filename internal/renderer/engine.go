@@ -311,9 +311,37 @@ func (r *Renderer) renderContentLine(col, row int, line string, innerW int, over
 }
 
 func (r *Renderer) drawLegendText(col, row int, legend *object.Legend, idx int) error {
+	canvasW := r.Canvas.W
+	canvasH := r.Canvas.H
+
 	for i, line := range strings.Split(legend.Text, "\n") {
-		if err := r.Canvas.PutStr(col, row+i, line, false, idx); err != nil {
-			return err
+		targetRow := row + i
+		if targetRow >= canvasH || col >= canvasW {
+			break
+		}
+
+		availableW := canvasW - col
+		textW := width.StrWidth(line)
+
+		if textW <= availableW {
+			if err := r.Canvas.PutStr(col, targetRow, line, false, idx); err != nil {
+				return err
+			}
+		} else {
+			var display string
+			switch legend.Overflow {
+			case object.OverflowEllipsis:
+				display = ellipsisTruncate(line, textW, availableW, object.AlignLeft)
+			case object.OverflowOverflow:
+				display = line
+			case object.OverflowHidden:
+				display = hiddenTruncate(line, availableW, object.AlignLeft)
+			case object.OverflowError:
+				return fmt.Errorf("content overflow: '%s' (%d cols) exceeds available width (%d cols)", line, textW, availableW)
+			}
+			if err := r.Canvas.PutStr(col, targetRow, display, false, idx); err != nil {
+				return err
+			}
 		}
 	}
 	return nil
@@ -481,54 +509,8 @@ func (r *Renderer) drawArrowLegend(wp [][2]int, legend *object.Legend, idx int) 
 		return nil
 	}
 
-	segIdx := 0
-	if len(wp) >= 3 {
-		bestLen := 0
-		for i := 1; i < len(wp)-1; i++ {
-			l := abs(wp[i][0]-wp[i+1][0]) + abs(wp[i][1]-wp[i+1][1])
-			if l > bestLen {
-				bestLen = l
-				segIdx = i
-			}
-		}
-	}
-
-	fc, fr := wp[segIdx][0], wp[segIdx][1]
-	tc, tr := wp[segIdx+1][0], wp[segIdx+1][1]
-	midC := (fc + tc) / 2
-	midR := (fr + tr) / 2
-	dir := object.SegmentDir(fc, fr, tc, tr)
-	isHorizontal := dir == object.DirLeft || dir == object.DirRight
-
-	effectivePos := legend.Pos
-	if effectivePos == object.LegendAuto {
-		if isHorizontal {
-			effectivePos = object.LegendTop
-		} else {
-			effectivePos = object.LegendRight
-		}
-	}
-
-	textW := width.StrWidth(legend.Text)
-	var lgCol, lgRow int
-	switch effectivePos {
-	case object.LegendTop:
-		lgCol, lgRow = max(midC-textW/2, 0), max(midR, 1)-1
-	case object.LegendBottom:
-		lgCol, lgRow = max(midC-textW/2, 0), midR+1
-	case object.LegendLeft:
-		lgCol, lgRow = max(midC-textW-1, 0), midR
-	case object.LegendRight:
-		lgCol, lgRow = midC+1, midR
-	}
+	lgCol, lgRow, _ := object.LegendPosition(wp, legend)
 	return r.drawLegendText(lgCol, lgRow, legend, idx)
-}
-
-func abs(x int) int {
-	if x < 0 {
-		return -x
-	}
-	return x
 }
 
 func (r *Renderer) drawStraightSegment(fc, fr, tc, tr int, withTip bool, tipChar rune, hasTip bool, idx int) error {

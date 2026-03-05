@@ -1,5 +1,7 @@
 package object
 
+import "github.com/silee9019/unicode-diagram/internal/width"
+
 type Dir int
 
 const (
@@ -297,6 +299,71 @@ func CornerChar(incoming, outgoing Dir) rune {
 	default:
 		return '┼'
 	}
+}
+
+// LegendPosition computes arrow legend position and column based on waypoints, legend config, and align.
+// Returns (col, row, textWidth).
+func LegendPosition(wp [][2]int, legend *Legend) (int, int, int) {
+	if len(wp) < 2 {
+		return 0, 0, 0
+	}
+
+	// For bent arrows, pick the longest segment from the second one onwards.
+	segIdx := 0
+	if len(wp) >= 3 {
+		bestLen := 0
+		for i := 1; i < len(wp)-1; i++ {
+			l := abs(wp[i][0]-wp[i+1][0]) + abs(wp[i][1]-wp[i+1][1])
+			if l > bestLen {
+				bestLen = l
+				segIdx = i
+			}
+		}
+	}
+
+	fc, fr := wp[segIdx][0], wp[segIdx][1]
+	tc, tr := wp[segIdx+1][0], wp[segIdx+1][1]
+	midC := (fc + tc) / 2
+	midR := (fr + tr) / 2
+	dir := SegmentDir(fc, fr, tc, tr)
+	isHorizontal := dir == DirLeft || dir == DirRight
+
+	effectivePos := legend.Pos
+	if effectivePos == LegendAuto {
+		if isHorizontal {
+			effectivePos = LegendTop
+		} else {
+			effectivePos = LegendRight
+		}
+	}
+
+	textW := width.StrWidth(legend.Text)
+
+	var lgCol, lgRow int
+	switch effectivePos {
+	case LegendTop, LegendBottom:
+		switch legend.Align {
+		case AlignLeft:
+			lgCol = midC
+		case AlignCenter:
+			lgCol = max(midC-textW/2, 0)
+		case AlignRight:
+			lgCol = max(midC-textW, 0)
+		}
+		if effectivePos == LegendTop {
+			lgRow = max(midR, 1) - 1
+		} else {
+			lgRow = midR + 1
+		}
+	case LegendLeft:
+		lgCol = max(midC-textW-1, 0)
+		lgRow = midR
+	case LegendRight:
+		lgCol = midC + 1
+		lgRow = midR
+	}
+
+	return lgCol, lgRow, textW
 }
 
 func SegmentDir(fx, fy, tx, ty int) Dir {

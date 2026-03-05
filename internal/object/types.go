@@ -122,6 +122,15 @@ func (a *ResolvedArrow) Bounds() (int, int) {
 			maxRow = wp[1]
 		}
 	}
+	if a.Legend != nil {
+		lc, lr, lw := LegendPosition(a.Waypoints, a.Legend)
+		if lc+lw > maxCol {
+			maxCol = lc + lw
+		}
+		if lr+1 > maxRow {
+			maxRow = lr + 1
+		}
+	}
 	return maxCol + 1, maxRow + 1
 }
 

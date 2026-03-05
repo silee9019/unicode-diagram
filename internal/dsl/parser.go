@@ -530,7 +530,7 @@ func parseArrow(tokens []string, line int) (DslCommand, error) {
 				if lgOverflow != nil {
 					overflow = *lgOverflow
 				}
-				align := object.AlignLeft
+				align := object.AlignCenter
 				if lgAlign != nil {
 					align = *lgAlign
 				}

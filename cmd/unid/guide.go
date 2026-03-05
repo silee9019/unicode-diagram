@@ -31,6 +31,7 @@ DSL SYNTAX:
         [align(a)=<align>] [legend-pos(lp)=top(t)|bottom(b)]
         [legend-overflow(lo)=<mode>] [legend-align(la)=<align>]
         [legend(lg)=<text>] [content(c)=<text>]
+      - W, H: inner size (border excluded). Total: (W+2) x (H+2)
       - "rect" is accepted as an alias for "box"
     text <col> <row> [id=<name>] content(c)=<text>
     hline <col> <row> <length> [id=<name>] [style(s)=<style>] [pos=<pos>]
@@ -71,6 +72,7 @@ ALIGNMENT (align(a)= / legend-align(la)=):
   left(l, default):   Left-aligned (right side truncated/overflows)
   center(c):          Center-aligned (both sides truncated/overflow)
   right(r):           Right-aligned (left side truncated/overflows)
+  Note: arrow legend-align defaults to center(c); all others default to left(l).
 
 LEGEND POSITION:
   Box:      legend-pos(lp)=top(t)|bottom(b)         (default: top)
@@ -113,6 +115,16 @@ ARROWS:
 RENDERING:
   2-pass rendering: structure first (borders, lines), then text (c=, lg=, text).
   Text content always renders on top of structural elements.
+
+TIPS:
+  - canvas auto is recommended — auto-computes minimum canvas size.
+  - Arrow legend is placed near the midpoint of the longest segment.
+    Multiple arrows in the same area may have overlapping legends.
+  - For precise label positioning, use text objects instead of arrow legends:
+      arrow src.b dst.t
+      text 15 7 c=my label
+  - Legend text exceeding canvas bounds is truncated per legend-overflow mode
+    (default: ellipsis). Use lo=overflow to allow overflow beyond canvas edge.
 
 EXAMPLE:
   input:
