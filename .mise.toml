@@ -1,36 +1,36 @@
 [tools]
-rust = "latest"
+go = "latest"
 
 [tasks.build]
 description = "Build the project"
-run = "cargo build"
+run = "go build -o unid ./cmd/unid"
 
 [tasks.test]
 description = "Run tests"
-run = "cargo test"
+run = "go test ./..."
 
 [tasks.test-render]
 description = "Run render tests with visible diagram output"
-run = "cargo test render_complex -- --nocapture"
+run = "go test -v -run TestGoldenFiles/render_complex ./..."
 
 [tasks.lint]
-description = "Run clippy linter"
-run = "cargo clippy -- -D warnings"
+description = "Run go vet linter"
+run = "go vet ./..."
 
 [tasks.fmt]
 description = "Format code"
-run = "cargo fmt"
+run = "gofmt -w ."
 
 [tasks.fmt-check]
 description = "Check code formatting"
-run = "cargo fmt -- --check"
+run = "test -z \"$(gofmt -l .)\""
 
 [tasks.link]
 description = "Build and symlink unid to ~/.local/bin"
 depends = ["build"]
 run = """
 mkdir -p ~/.local/bin
-ln -sf "$(pwd)/target/debug/unid" ~/.local/bin/unid
+ln -sf "$(pwd)/unid" ~/.local/bin/unid
 echo "Linked: ~/.local/bin/unid"
 """
 
@@ -52,3 +52,4 @@ fi
 description = "Interactive release (version bump, tag, push)"
 raw = true
 run = "bash scripts/release.sh"
+
