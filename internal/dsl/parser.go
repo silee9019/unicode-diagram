@@ -228,12 +228,19 @@ func parseText(tokens []string, line int) (DslCommand, error) {
 	greedyIdx := greedyTokenIndex(tokens, 3)
 	var id string
 
+	var align object.ContentAlign
 	for _, token := range tokens[3:greedyIdx] {
 		if v, ok := stripOption(token, "id"); ok {
 			if err := validateID(v, line); err != nil {
 				return nil, err
 			}
 			id = v
+		} else if v, ok := stripOption(token, "align", "a"); ok {
+			ca, err := parseContentAlign(v, line)
+			if err != nil {
+				return nil, err
+			}
+			align = ca
 		} else {
 			return nil, &uerr.ParseError{Line: line, Message: fmt.Sprintf("unknown text option '%s'", token)}
 		}
@@ -245,6 +252,7 @@ func parseText(tokens []string, line int) (DslCommand, error) {
 	}
 	text := object.NewText(col, row, content)
 	text.ID = id
+	text.ContentAlign = align
 	return &ObjectCmd{Object: text}, nil
 }
 

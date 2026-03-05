@@ -311,8 +311,17 @@ func (r *Renderer) drawLegendText(col, row int, legend *object.Legend, idx int) 
 // --- Text ---
 
 func (r *Renderer) drawText(text *object.Text, idx int) error {
+	maxW := text.BBoxWidth()
 	for i, line := range strings.Split(text.Content, "\n") {
-		if err := r.Canvas.PutStr(text.Col, text.Row+i, line, r.Collision, idx); err != nil {
+		padLeft := 0
+		lineW := width.StrWidth(line)
+		switch text.ContentAlign {
+		case object.AlignCenter:
+			padLeft = max(maxW-lineW, 0) / 2
+		case object.AlignRight:
+			padLeft = max(maxW-lineW, 0)
+		}
+		if err := r.Canvas.PutStr(text.Col+padLeft, text.Row+i, line, r.Collision, idx); err != nil {
 			return err
 		}
 	}

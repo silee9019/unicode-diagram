@@ -31,7 +31,7 @@ DSL SYNTAX:
         [legend(lg)=<text>] [content(c)=<text>]
       - W, H: inner size (border excluded). Total: (W+2) x (H+2)
       - "rect" is accepted as an alias for "box"
-    text <col> <row> [id=<name>] content(c)=<text>
+    text <col> <row> [id=<name>] [align(a)=<align>] content(c)=<text>
     hline <col> <row> <length> [id=<name>] [style(s)=<style>] [pos=<pos>]
         [legend-overflow(lo)=<mode>] [legend-align(la)=<align>] [legend(lg)=<text>]
     vline <col> <row> <length> [id=<name>] [style(s)=<style>] [pos=<pos>]

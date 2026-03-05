@@ -273,7 +273,7 @@ func runRender() error {
 	r.GlobalOverflow = config.globalOverflow
 	r.GlobalAlign = config.globalAlign
 
-	// Apply global defaults to rects
+	// Apply global defaults to rects and texts
 	objects := make([]object.DrawObject, len(config.objects))
 	for i, obj := range config.objects {
 		if rect, ok := obj.(*object.Rect); ok {
@@ -282,6 +282,11 @@ func runRender() error {
 			}
 			if rect.ContentAlign == object.AlignLeft {
 				rect.ContentAlign = config.globalAlign
+			}
+		}
+		if text, ok := obj.(*object.Text); ok {
+			if text.ContentAlign == object.AlignLeft {
+				text.ContentAlign = config.globalAlign
 			}
 		}
 		objects[i] = obj

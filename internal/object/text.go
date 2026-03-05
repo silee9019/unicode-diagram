@@ -7,16 +7,17 @@ import (
 )
 
 type Text struct {
-	Col, Row int
-	Content  string
-	ID       string
+	Col, Row     int
+	Content      string
+	ID           string
+	ContentAlign ContentAlign
 }
 
 func NewText(col, row int, content string) *Text {
 	return &Text{Col: col, Row: row, Content: content}
 }
 
-func (t *Text) bboxWidth() int {
+func (t *Text) BBoxWidth() int {
 	maxW := 0
 	for _, line := range strings.Split(t.Content, "\n") {
 		if w := width.StrWidth(line); w > maxW {
@@ -35,7 +36,7 @@ func (t *Text) bboxHeight() int {
 }
 
 func (t *Text) SrcAnchor(side Side) (int, int) {
-	w := t.bboxWidth()
+	w := t.BBoxWidth()
 	h := t.bboxHeight()
 	switch side {
 	case SideTop:
