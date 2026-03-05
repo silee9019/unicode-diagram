@@ -479,7 +479,9 @@ impl Renderer {
         Ok(())
     }
 
-    /// Draws arrow legend text near the midpoint of the first segment.
+    /// Draws arrow legend text near the midpoint of a segment.
+    /// For bent arrows (3+ waypoints), uses the longest segment from the second onwards.
+    /// For straight arrows (2 waypoints), uses the only segment.
     fn draw_arrow_legend(
         &mut self,
         wp: &[(usize, usize)],
@@ -490,8 +492,21 @@ impl Renderer {
             return Ok(());
         }
 
-        let (fc, fr) = wp[0];
-        let (tc, tr) = wp[1];
+        // For bent arrows, pick the longest segment from the second one onwards.
+        let seg_idx = if wp.len() >= 3 {
+            (1..wp.len() - 1)
+                .max_by_key(|&i| {
+                    let (fc, fr) = wp[i];
+                    let (tc, tr) = wp[i + 1];
+                    fc.abs_diff(tc) + fr.abs_diff(tr)
+                })
+                .unwrap_or(1)
+        } else {
+            0
+        };
+
+        let (fc, fr) = wp[seg_idx];
+        let (tc, tr) = wp[seg_idx + 1];
         let mid_c = (fc + tc) / 2;
         let mid_r = (fr + tr) / 2;
         let dir = segment_dir(fc, fr, tc, tr);
