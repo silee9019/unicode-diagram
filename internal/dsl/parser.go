@@ -24,7 +24,7 @@ func Parse(input string) ([]DslCommand, error) {
 		if len(tokens) == 0 {
 			continue
 		}
-		cmd, err := parseCommand(tokens, lineNum)
+		cmd, err := parseCommand(tokens, lineNum, trimmed)
 		if err != nil {
 			return nil, err
 		}
@@ -33,7 +33,7 @@ func Parse(input string) ([]DslCommand, error) {
 	return commands, nil
 }
 
-func parseCommand(tokens []string, line int) (DslCommand, error) {
+func parseCommand(tokens []string, line int, rawLine string) (DslCommand, error) {
 	keyword := strings.ToLower(tokens[0])
 	switch keyword {
 	case "collision":
@@ -43,15 +43,15 @@ func parseCommand(tokens []string, line int) (DslCommand, error) {
 	case "align":
 		return parseAlignCmd(tokens, line)
 	case "box", "rect":
-		return parseRect(tokens, line)
+		return parseRect(tokens, line, rawLine)
 	case "text":
-		return parseText(tokens, line)
+		return parseText(tokens, line, rawLine)
 	case "hline":
-		return parseHLine(tokens, line)
+		return parseHLine(tokens, line, rawLine)
 	case "vline":
-		return parseVLine(tokens, line)
+		return parseVLine(tokens, line, rawLine)
 	case "arrow":
-		return parseArrow(tokens, line)
+		return parseArrow(tokens, line, rawLine)
 	case "arrowhead":
 		return parseArrowhead(tokens, line)
 	default:
@@ -95,7 +95,7 @@ func parseAlignCmd(tokens []string, line int) (DslCommand, error) {
 	return &AlignCmd{Mode: mode}, nil
 }
 
-func parseRect(tokens []string, line int) (DslCommand, error) {
+func parseRect(tokens []string, line int, rawLine string) (DslCommand, error) {
 	if len(tokens) < 5 {
 		return nil, &uerr.ParseError{Line: line, Message: "box requires col, row, width, height"}
 	}
@@ -176,7 +176,7 @@ func parseRect(tokens []string, line int) (DslCommand, error) {
 	if greedyIdx < len(tokens) {
 		for i := greedyIdx; i < len(tokens); i++ {
 			if strings.HasPrefix(tokens[i], "content=") || strings.HasPrefix(tokens[i], "c=") {
-				content, err := extractContent(tokens, i, line)
+				content, err := extractContent(rawLine, line)
 				if err != nil {
 					return nil, err
 				}
@@ -187,7 +187,7 @@ func parseRect(tokens []string, line int) (DslCommand, error) {
 		}
 		for i := greedyIdx; i < len(tokens); i++ {
 			if strings.HasPrefix(tokens[i], "legend=") || strings.HasPrefix(tokens[i], "lg=") {
-				lgText, err := extractLegend(tokens, i, line)
+				lgText, err := extractLegend(rawLine, line)
 				if err != nil {
 					return nil, err
 				}
@@ -212,7 +212,7 @@ func parseRect(tokens []string, line int) (DslCommand, error) {
 	return &ObjectCmd{Object: rect}, nil
 }
 
-func parseText(tokens []string, line int) (DslCommand, error) {
+func parseText(tokens []string, line int, rawLine string) (DslCommand, error) {
 	if len(tokens) < 4 {
 		return nil, &uerr.ParseError{Line: line, Message: "text requires col, row, content=<value>"}
 	}
@@ -246,7 +246,7 @@ func parseText(tokens []string, line int) (DslCommand, error) {
 		}
 	}
 
-	content, err := extractContent(tokens, greedyIdx, line)
+	content, err := extractContent(rawLine, line)
 	if err != nil {
 		return nil, err
 	}
@@ -256,7 +256,7 @@ func parseText(tokens []string, line int) (DslCommand, error) {
 	return &ObjectCmd{Object: text}, nil
 }
 
-func parseHLine(tokens []string, line int) (DslCommand, error) {
+func parseHLine(tokens []string, line int, rawLine string) (DslCommand, error) {
 	if len(tokens) < 4 {
 		return nil, &uerr.ParseError{Line: line, Message: "hline requires col, row, length"}
 	}
@@ -318,7 +318,7 @@ func parseHLine(tokens []string, line int) (DslCommand, error) {
 	if greedyIdx < len(tokens) {
 		for i := greedyIdx; i < len(tokens); i++ {
 			if strings.HasPrefix(tokens[i], "legend=") || strings.HasPrefix(tokens[i], "lg=") {
-				lgText, err := extractLegend(tokens, i, line)
+				lgText, err := extractLegend(rawLine, line)
 				if err != nil {
 					return nil, err
 				}
@@ -343,7 +343,7 @@ func parseHLine(tokens []string, line int) (DslCommand, error) {
 	return &ObjectCmd{Object: hl}, nil
 }
 
-func parseVLine(tokens []string, line int) (DslCommand, error) {
+func parseVLine(tokens []string, line int, rawLine string) (DslCommand, error) {
 	if len(tokens) < 4 {
 		return nil, &uerr.ParseError{Line: line, Message: "vline requires col, row, length"}
 	}
@@ -405,7 +405,7 @@ func parseVLine(tokens []string, line int) (DslCommand, error) {
 	if greedyIdx < len(tokens) {
 		for i := greedyIdx; i < len(tokens); i++ {
 			if strings.HasPrefix(tokens[i], "legend=") || strings.HasPrefix(tokens[i], "lg=") {
-				lgText, err := extractLegend(tokens, i, line)
+				lgText, err := extractLegend(rawLine, line)
 				if err != nil {
 					return nil, err
 				}
@@ -430,7 +430,7 @@ func parseVLine(tokens []string, line int) (DslCommand, error) {
 	return &ObjectCmd{Object: vl}, nil
 }
 
-func parseArrow(tokens []string, line int) (DslCommand, error) {
+func parseArrow(tokens []string, line int, rawLine string) (DslCommand, error) {
 	if len(tokens) < 3 {
 		return nil, &uerr.ParseError{Line: line, Message: "arrow requires <src_id>.<side> <dst_id>.<side> (e.g., 'arrow api.right db.top')"}
 	}
@@ -495,7 +495,7 @@ func parseArrow(tokens []string, line int) (DslCommand, error) {
 	if greedyIdx < len(tokens) {
 		for i := greedyIdx; i < len(tokens); i++ {
 			if strings.HasPrefix(tokens[i], "legend=") || strings.HasPrefix(tokens[i], "lg=") {
-				lgText, err := extractLegend(tokens, i, line)
+				lgText, err := extractLegend(rawLine, line)
 				if err != nil {
 					return nil, err
 				}
@@ -542,74 +542,81 @@ func parseArrowhead(tokens []string, line int) (DslCommand, error) {
 
 // --- helpers ---
 
-func extractContent(tokens []string, from, line int) (string, error) {
-	for i := from; i < len(tokens); i++ {
-		var valueStart string
-		var found bool
-		if after, ok := strings.CutPrefix(tokens[i], "content="); ok {
-			valueStart = after
-			found = true
-		} else if after, ok := strings.CutPrefix(tokens[i], "c="); ok {
-			valueStart = after
-			found = true
-		}
-		if found {
-			parts := make([]string, 0)
-			if valueStart != "" {
-				parts = append(parts, valueStart)
-			}
-			parts = append(parts, tokens[i+1:]...)
-			if len(parts) == 0 {
-				return "", &uerr.ParseError{Line: line, Message: "content= requires a value"}
-			}
-			content := strings.Join(parts, " ")
-			content = strings.ReplaceAll(content, "<br>", "\n")
-			// Trim each line
-			lines := strings.Split(content, "\n")
-			for j := range lines {
-				lines[j] = strings.TrimSpace(lines[j])
-			}
-			return strings.Join(lines, "\n"), nil
-		}
+func extractContent(rawLine string, line int) (string, error) {
+	idx, prefixLen := findGreedyStart(rawLine, "content=", "c=")
+	if idx < 0 {
+		return "", &uerr.ParseError{Line: line, Message: "missing content= (or c=)"}
 	}
-	return "", &uerr.ParseError{Line: line, Message: "missing content= (or c=)"}
+	raw := rawLine[idx+prefixLen:]
+	raw = strings.TrimRight(raw, " \t")
+	if raw == "" {
+		return "", &uerr.ParseError{Line: line, Message: "content= requires a value"}
+	}
+	raw = strings.ReplaceAll(raw, "<br>", "\n")
+	lines := strings.Split(raw, "\n")
+	for j := range lines {
+		lines[j] = strings.TrimRight(lines[j], " \t")
+	}
+	return strings.Join(lines, "\n"), nil
 }
 
-func extractLegend(tokens []string, from, line int) (string, error) {
-	for i := from; i < len(tokens); i++ {
-		var valueStart string
-		var found bool
-		if after, ok := strings.CutPrefix(tokens[i], "legend="); ok {
-			valueStart = after
-			found = true
-		} else if after, ok := strings.CutPrefix(tokens[i], "lg="); ok {
-			valueStart = after
-			found = true
+func extractLegend(rawLine string, line int) (string, error) {
+	idx, prefixLen := findGreedyStart(rawLine, "legend=", "lg=")
+	if idx < 0 {
+		return "", &uerr.ParseError{Line: line, Message: "missing lg= (or legend=)"}
+	}
+	raw := rawLine[idx+prefixLen:]
+	// Legend ends before content= or c= if present
+	if endIdx := findGreedyEnd(raw, "content=", "c="); endIdx >= 0 {
+		raw = raw[:endIdx]
+	}
+	raw = strings.TrimRight(raw, " \t")
+	if raw == "" {
+		return "", &uerr.ParseError{Line: line, Message: "lg= requires a value"}
+	}
+	raw = strings.ReplaceAll(raw, "<br>", "\n")
+	lines := strings.Split(raw, "\n")
+	for j := range lines {
+		lines[j] = strings.TrimRight(lines[j], " \t")
+	}
+	return strings.Join(lines, "\n"), nil
+}
+
+// findGreedyStart finds a greedy prefix at a word boundary (preceded by space or at string start).
+// Returns (index, prefixLen) or (-1, 0).
+func findGreedyStart(s string, prefixes ...string) (int, int) {
+	bestIdx := -1
+	bestLen := 0
+	for _, p := range prefixes {
+		if strings.HasPrefix(s, p) {
+			if bestIdx < 0 {
+				bestIdx = 0
+				bestLen = len(p)
+			}
 		}
-		if found {
-			parts := make([]string, 0)
-			if valueStart != "" {
-				parts = append(parts, valueStart)
+		if idx := strings.Index(s, " "+p); idx >= 0 {
+			pos := idx + 1
+			if bestIdx < 0 || pos < bestIdx {
+				bestIdx = pos
+				bestLen = len(p)
 			}
-			for _, t := range tokens[i+1:] {
-				if strings.HasPrefix(t, "content=") || strings.HasPrefix(t, "c=") {
-					break
-				}
-				parts = append(parts, t)
-			}
-			if len(parts) == 0 {
-				return "", &uerr.ParseError{Line: line, Message: "lg= requires a value"}
-			}
-			content := strings.Join(parts, " ")
-			content = strings.ReplaceAll(content, "<br>", "\n")
-			lines := strings.Split(content, "\n")
-			for j := range lines {
-				lines[j] = strings.TrimSpace(lines[j])
-			}
-			return strings.Join(lines, "\n"), nil
 		}
 	}
-	return "", &uerr.ParseError{Line: line, Message: "missing lg= (or legend=)"}
+	return bestIdx, bestLen
+}
+
+// findGreedyEnd finds the position of a greedy prefix preceded by space (not at string start).
+// Used to find where legend text ends before content starts.
+func findGreedyEnd(s string, prefixes ...string) int {
+	bestIdx := -1
+	for _, p := range prefixes {
+		if idx := strings.Index(s, " "+p); idx >= 0 {
+			if bestIdx < 0 || idx < bestIdx {
+				bestIdx = idx
+			}
+		}
+	}
+	return bestIdx
 }
 
 func greedyTokenIndex(tokens []string, from int) int {
