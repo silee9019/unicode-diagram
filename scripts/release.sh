@@ -82,4 +82,4 @@ gum spin --title "Pushing to origin..." -- bash -c \
 echo ""
 gum style --bold --foreground 2 "✓ Released v${NEW_VERSION}!"
 echo "GitHub Actions will now build and publish the release."
-echo "Track progress: https://github.com/silee9019/unicode-diagram/actions"
+echo "Track progress: https://github.com/silee-tools/unicode-diagram/actions"

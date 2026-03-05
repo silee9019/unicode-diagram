@@ -12,13 +12,13 @@ Renders precise Unicode box-drawing diagrams from a simple DSL via stdin.
 ### Homebrew (macOS)
 
 ```sh
-brew install silee9019/tap/unid
+brew install silee-tools/tap/unid
 ```
 
 ### Build from source
 
 ```sh
-git clone https://github.com/silee9019/unicode-diagram.git
+git clone https://github.com/silee-tools/unicode-diagram.git
 cd unicode-diagram
 cargo install --path .
 ```

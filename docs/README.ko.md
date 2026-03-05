@@ -12,13 +12,13 @@ Monodraw, ASCIIFlow 같은 도구의 텍스트 기반 대안입니다.
 ### Homebrew (macOS)
 
 ```sh
-brew install silee9019/tap/unid
+brew install silee-tools/tap/unid
 ```
 
 ### 소스 빌드
 
 ```sh
-git clone https://github.com/silee9019/unicode-diagram.git
+git clone https://github.com/silee-tools/unicode-diagram.git
 cd unicode-diagram
 cargo install --path .
 ```

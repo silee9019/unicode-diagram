@@ -101,9 +101,9 @@ jobs:
           ARM_SHA256=$(awk '{print $1}' "artifacts/${ARM_ARCHIVE}.sha256")
           X86_SHA256=$(awk '{print $1}' "artifacts/${X86_ARCHIVE}.sha256")
 
-          BASE_URL="https://github.com/silee9019/unicode-diagram/releases/download/${TAG}"
+          BASE_URL="https://github.com/silee-tools/unicode-diagram/releases/download/${TAG}"
 
-          git clone "https://x-access-token:${HOMEBREW_TAP_TOKEN}@github.com/silee9019/homebrew-tap.git" tap
+          git clone "https://x-access-token:${HOMEBREW_TAP_TOKEN}@github.com/silee-tools/homebrew-tap.git" tap
           cd tap
 
           mkdir -p Formula
@@ -111,7 +111,7 @@ jobs:
           cat > Formula/unid.rb << FORMULA
           class Unid < Formula
             desc "CLI tool for rendering ASCII diagrams using Unicode box-drawing characters"
-            homepage "https://github.com/silee9019/unicode-diagram"
+            homepage "https://github.com/silee-tools/unicode-diagram"
             license "MIT"
             version "${VERSION}"
 
