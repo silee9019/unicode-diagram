@@ -3,8 +3,8 @@ package renderer
 import (
 	"testing"
 
-	"github.com/silee9019/unicode-diagram/internal/canvas"
-	"github.com/silee9019/unicode-diagram/internal/object"
+	"github.com/silee-tools/unid/internal/canvas"
+	"github.com/silee-tools/unid/internal/object"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

@@ -1,4 +1,4 @@
-# unicode-diagram
+# unid (Unicode Diagram)
 
 Unicode box-drawing 문자를 활용한 ASCII 다이어그램 렌더링 CLI 도구.
 
@@ -18,8 +18,8 @@ brew install silee-tools/tap/unid
 ### 소스 빌드
 
 ```sh
-git clone https://github.com/silee-tools/unicode-diagram.git
-cd unicode-diagram
+git clone https://github.com/silee-tools/unid.git
+cd unid
 go build -o unid ./cmd/unid
 # $GOPATH/bin에 설치:
 go install ./cmd/unid

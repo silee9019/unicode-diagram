@@ -1,4 +1,4 @@
-# unicode-diagram
+# unid (Unicode Diagram)
 
 CLI tool for rendering ASCII diagrams using Unicode box-drawing characters.
 
@@ -18,8 +18,8 @@ brew install silee-tools/tap/unid
 ### Build from source
 
 ```sh
-git clone https://github.com/silee-tools/unicode-diagram.git
-cd unicode-diagram
+git clone https://github.com/silee-tools/unid.git
+cd unid
 go build -o unid ./cmd/unid
 # optionally install to $GOPATH/bin:
 go install ./cmd/unid

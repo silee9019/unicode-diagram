@@ -8,11 +8,11 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/silee9019/unicode-diagram/internal/canvas"
-	"github.com/silee9019/unicode-diagram/internal/dsl"
-	uerr "github.com/silee9019/unicode-diagram/internal/errors"
-	"github.com/silee9019/unicode-diagram/internal/object"
-	"github.com/silee9019/unicode-diagram/internal/renderer"
+	"github.com/silee-tools/unid/internal/canvas"
+	"github.com/silee-tools/unid/internal/dsl"
+	uerr "github.com/silee-tools/unid/internal/errors"
+	"github.com/silee-tools/unid/internal/object"
+	"github.com/silee-tools/unid/internal/renderer"
 )
 
 var version = "dev"

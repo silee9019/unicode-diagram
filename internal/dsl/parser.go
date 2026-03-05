@@ -6,8 +6,8 @@ import (
 	"strings"
 	"unicode"
 
-	uerr "github.com/silee9019/unicode-diagram/internal/errors"
-	"github.com/silee9019/unicode-diagram/internal/object"
+	uerr "github.com/silee-tools/unid/internal/errors"
+	"github.com/silee-tools/unid/internal/object"
 )
 
 func Parse(input string) ([]DslCommand, error) {

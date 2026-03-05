@@ -5,10 +5,10 @@ import (
 	"math"
 	"strings"
 
-	"github.com/silee9019/unicode-diagram/internal/canvas"
-	uerr "github.com/silee9019/unicode-diagram/internal/errors"
-	"github.com/silee9019/unicode-diagram/internal/object"
-	"github.com/silee9019/unicode-diagram/internal/width"
+	"github.com/silee-tools/unid/internal/canvas"
+	uerr "github.com/silee-tools/unid/internal/errors"
+	"github.com/silee-tools/unid/internal/object"
+	"github.com/silee-tools/unid/internal/width"
 )
 
 type Renderer struct {

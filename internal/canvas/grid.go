@@ -3,8 +3,8 @@ package canvas
 import (
 	"strings"
 
-	uerr "github.com/silee9019/unicode-diagram/internal/errors"
-	"github.com/silee9019/unicode-diagram/internal/width"
+	uerr "github.com/silee-tools/unid/internal/errors"
+	"github.com/silee-tools/unid/internal/width"
 )
 
 type Canvas struct {

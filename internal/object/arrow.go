@@ -1,6 +1,6 @@
 package object
 
-import "github.com/silee9019/unicode-diagram/internal/width"
+import "github.com/silee-tools/unid/internal/width"
 
 type Dir int
 

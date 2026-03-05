@@ -1,6 +1,6 @@
-# unicode-diagram
+# unid (Unicode Diagram)
 
-Unicode box-drawing 다이어그램 렌더링 CLI. 바이너리 이름: `unid`
+Unicode box-drawing 다이어그램 렌더링 CLI.
 
 ## 프로젝트 구조
 
@@ -19,7 +19,7 @@ integration_test.go  CLI 통합 테스트
 ## 개발
 
 - Language: Go 1.23+
-- Module: github.com/silee9019/unicode-diagram
+- Module: github.com/silee-tools/unid
 - Task Runner: mise
 - Build: `mise run build`
 - Test: `mise run test`

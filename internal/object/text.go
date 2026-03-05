@@ -3,7 +3,7 @@ package object
 import (
 	"strings"
 
-	"github.com/silee9019/unicode-diagram/internal/width"
+	"github.com/silee-tools/unid/internal/width"
 )
 
 type Text struct {

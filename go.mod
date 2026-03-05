@@ -1,4 +1,4 @@
-module github.com/silee9019/unicode-diagram
+module github.com/silee-tools/unid
 
 go 1.25.0
 

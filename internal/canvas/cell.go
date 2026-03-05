@@ -1,6 +1,6 @@
 package canvas
 
-import "github.com/silee9019/unicode-diagram/internal/width"
+import "github.com/silee-tools/unid/internal/width"
 
 type Cell struct {
 	Ch             rune

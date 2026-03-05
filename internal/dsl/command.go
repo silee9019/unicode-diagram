@@ -1,6 +1,6 @@
 package dsl
 
-import "github.com/silee9019/unicode-diagram/internal/object"
+import "github.com/silee-tools/unid/internal/object"
 
 type DslCommand interface {
 	isDslCommand()
