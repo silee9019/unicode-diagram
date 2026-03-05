@@ -12,7 +12,7 @@ check_command() {
 check_command gum
 check_command gh
 check_command git
-check_command cargo
+check_command go
 
 # ─── Git clean state ───────────────────────────────────────
 if [[ -n "$(git status --porcelain)" ]]; then
@@ -22,7 +22,8 @@ if [[ -n "$(git status --porcelain)" ]]; then
 fi
 
 # ─── Current version ───────────────────────────────────────
-CURRENT_VERSION=$(grep '^version' Cargo.toml | head -1 | sed 's/.*"\(.*\)"/\1/')
+LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
+CURRENT_VERSION="${LAST_TAG#v}"
 gum log --level info "Current version: v${CURRENT_VERSION}"
 
 # ─── Version bump type ─────────────────────────────────────
@@ -52,11 +53,14 @@ if [[ ! "$NEW_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
   exit 1
 fi
 
+# ─── Verify build ──────────────────────────────────────────
+gum spin --title "Building..." -- go build -o /dev/null ./cmd/unid
+gum spin --title "Running tests..." -- go test ./...
+
 # ─── Show changelog since last tag ─────────────────────────
 echo ""
 gum style --bold "Changes since last release:"
-LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
-if [[ -n "$LAST_TAG" ]]; then
+if [[ "$LAST_TAG" != "v0.0.0" ]]; then
   git log "${LAST_TAG}..HEAD" --oneline --no-decorate
 else
   git log --oneline --no-decorate
@@ -66,16 +70,9 @@ fi
 echo ""
 gum confirm "Release v${NEW_VERSION}?" || { echo "Aborted."; exit 0; }
 
-# ─── Update Cargo.toml ─────────────────────────────────────
-sed -i '' "s/^version = \"${CURRENT_VERSION}\"/version = \"${NEW_VERSION}\"/" Cargo.toml
-cargo check --quiet 2>/dev/null
-
-# ─── Commit and tag ─────────────────────────────────────────
-git add Cargo.toml Cargo.lock
-git commit -m "release: v${NEW_VERSION}"
+# ─── Tag and push ──────────────────────────────────────────
 git tag -a "v${NEW_VERSION}" -m "v${NEW_VERSION}"
 
-# ─── Push ───────────────────────────────────────────────────
 gum spin --title "Pushing to origin..." -- bash -c \
   "git push origin main && git push origin v${NEW_VERSION}"
 

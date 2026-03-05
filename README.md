@@ -20,7 +20,9 @@ brew install silee-tools/tap/unid
 ```sh
 git clone https://github.com/silee-tools/unicode-diagram.git
 cd unicode-diagram
-cargo install --path .
+go build -o unid ./cmd/unid
+# optionally install to $GOPATH/bin:
+go install ./cmd/unid
 ```
 
 ## Usage
