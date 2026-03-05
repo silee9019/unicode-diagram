@@ -61,6 +61,12 @@ arrow b.r c.l' | unid
 
 자세한 사용법은 `unid guide`를 참조하세요.
 
+## AI와 함께 사용
+
+```
+unid 명령어를 사용해서 시스템 아키텍처를 그려줘. unid guide를 참고하면 돼.
+```
+
 ## 라이선스
 
 [MIT](../LICENSE)

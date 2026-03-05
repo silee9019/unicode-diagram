@@ -61,6 +61,12 @@ arrow b.r c.l' | unid
 
 See `unid guide` for full documentation.
 
+## Use with AI
+
+```
+Draw a system architecture diagram using the unid CLI. Refer to `unid guide` for the DSL syntax.
+```
+
 ## License
 
 [MIT](LICENSE)
