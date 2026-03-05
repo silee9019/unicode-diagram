@@ -314,7 +314,7 @@ func LegendPosition(wp [][2]int, legend *Legend) (int, int, int) {
 		bestLen := 0
 		for i := 1; i < len(wp)-1; i++ {
 			l := abs(wp[i][0]-wp[i+1][0]) + abs(wp[i][1]-wp[i+1][1])
-			if l > bestLen {
+			if l >= bestLen {
 				bestLen = l
 				segIdx = i
 			}
