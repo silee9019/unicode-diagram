@@ -1,30 +1,8 @@
-# unid (Unicode Diagram)
+# unid
 
-Unicode box-drawing 다이어그램 렌더링 CLI.
+## Development
 
-## 프로젝트 구조
-
-```
-cmd/unid/      CLI 진입점 (cobra), guide 출력
-internal/
-  errors/      커스텀 에러 타입
-  width/       Unicode 너비 유틸리티 (go-runewidth 래핑)
-  canvas/      2D 셀 그리드 (display-column 좌표계)
-  object/      DrawObject (box, text, hline, vline, arrow)
-  dsl/         DSL 텍스트 파서 → DslCommand
-  renderer/    Canvas에 DrawObject를 그리는 2-pass 엔진
-integration_test.go  CLI 통합 테스트
-```
-
-## 개발
-
-- Language: Go 1.23+
-- Module: github.com/silee-tools/unid
-- Task Runner: mise
-- Build: `mise run build`
-- Test: `mise run test`
-- Lint: `mise run lint`
-- Format: `mise run fmt`
+Run `mise tasks` to list available tasks.
 
 ## Guide 예제 관리
 
