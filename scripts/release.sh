@@ -3,7 +3,7 @@ set -euo pipefail
 
 # ─── Prerequisites ──────────────────────────────────────────
 check_command() {
-  if ! command -v "$1" &>/dev/null; then
+  if ! command -v "$1" >/dev/null 2>&1; then
     gum log --level error "'$1' is required but not found."
     exit 1
   fi
