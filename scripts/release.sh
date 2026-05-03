@@ -73,8 +73,8 @@ gum confirm "Release v${NEW_VERSION}?" || { echo "Aborted."; exit 0; }
 # ─── Tag and push ──────────────────────────────────────────
 git tag -a "v${NEW_VERSION}" -m "v${NEW_VERSION}"
 
-gum spin --title "Pushing to origin..." -- bash -c \
-  "git push origin main && git push origin v${NEW_VERSION}"
+gum spin --title "Pushing main to origin..." -- git push origin main
+gum spin --title "Pushing tag to origin..." -- git push origin "v${NEW_VERSION}"
 
 echo ""
 gum style --bold --foreground 2 "✓ Released v${NEW_VERSION}!"
