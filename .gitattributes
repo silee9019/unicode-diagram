@@ -1,0 +1,14 @@
+# Normalize line endings for source-controlled text files.
+* text=auto
+
+# Runtime and repository policy files should stay LF on every checkout.
+*.go text eol=lf
+*.sh text eol=lf
+*.toml text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.md text eol=lf
+*.dsl text eol=lf
+*.golden text eol=lf
+.gitignore text eol=lf
+.gitattributes text eol=lf
