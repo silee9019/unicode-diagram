@@ -49,7 +49,7 @@ fi
 """
 
 [tasks.release]
-description = "Interactive release (version bump, tag, push)"
+description = "Dispatch the interactive GitHub Actions release workflow"
 raw = true
 run = "bash scripts/release.sh"
 
