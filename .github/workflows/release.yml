@@ -24,7 +24,7 @@ concurrency:
 
 jobs:
   prepare:
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     outputs:
       version: ${{ steps.version.outputs.version }}
       tag: ${{ steps.version.outputs.tag }}
@@ -104,7 +104,7 @@ jobs:
           - goos: darwin
             goarch: arm64
             target: aarch64-apple-darwin
-            runner: macos-latest
+            runner: self-hosted
           - goos: linux
             goarch: amd64
             target: x86_64-unknown-linux-gnu
@@ -155,7 +155,7 @@ jobs:
 
   release:
     needs: [prepare, build]
-    runs-on: [self-hosted, linux, x86_64]
+    runs-on: self-hosted
     steps:
       - uses: actions/checkout@v4
         with:
@@ -180,7 +180,7 @@ jobs:
 
   update-homebrew:
     needs: [prepare, release]
-    runs-on: [self-hosted, linux, x86_64]
+    runs-on: self-hosted
     steps:
       - name: Download all artifacts
         uses: actions/download-artifact@v4
