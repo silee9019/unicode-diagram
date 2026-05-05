@@ -3,6 +3,8 @@
 
 # Runtime and repository policy files should stay LF on every checkout.
 *.go text eol=lf
+go.mod text eol=lf
+go.sum text eol=lf
 *.sh text eol=lf
 *.toml text eol=lf
 *.yml text eol=lf
@@ -12,3 +14,4 @@
 *.golden text eol=lf
 .gitignore text eol=lf
 .gitattributes text eol=lf
+.editorconfig text eol=lf
