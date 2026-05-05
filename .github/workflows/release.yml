@@ -39,6 +39,7 @@ jobs:
 
       - name: Verify build and tests
         run: |
+          set -euo pipefail
           go build -o /dev/null ./cmd/unid
           go test ./...
 
@@ -132,6 +133,7 @@ jobs:
         env:
           TAG: ${{ needs.prepare.outputs.tag }}
         run: |
+          set -euo pipefail
           ARCHIVE="unid-${TAG}-${{ matrix.target }}.tar.gz"
           mkdir -p staging
           cp unid staging/
@@ -172,6 +174,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAG: ${{ needs.prepare.outputs.tag }}
         run: |
+          set -euo pipefail
           gh release create "${TAG}" \
             --title "${TAG}" \
             --generate-notes \
